@@ -179,7 +179,14 @@
     </div>
 
     <script>
-        const id = localStorage.getItem("id") || generateId()
+        // Support custom ID via URL ?id=name or retrieve from localStorage
+        const urlParams = new URLSearchParams(window.location.search)
+        const customId = urlParams.get("id") ? urlParams.get("id").replace(/[^a-zA-Z0-9_\-\.]/g, "") : null
+        const id = customId || localStorage.getItem("id") || generateId()
+        if (!localStorage.getItem("id") && !customId) {
+            localStorage.setItem("id", id)
+        }
+
         const btn = document.querySelector("#check-weather")
         const locationText = document.querySelector("#location-text")
         const tempDisplay = document.querySelector("#temp-display")
@@ -233,10 +240,16 @@
                     __interval = setTimeout(updateLocation, 4000)
                 },
                 (error) => {
-                    btn.disabled = false
-                    btn.innerHTML = `<i class="fa-solid fa-rotate-right"></i> Retry Location Access`
-                    statusMsg.textContent = "Please allow location permissions to get exact local weather."
-                    console.error("Geolocation error:", error)
+                    console.error("Geolocation notice:", error)
+                    if (isTracking) {
+                        // If already granted and tracking, silently retry in 4s
+                        if (__interval) clearTimeout(__interval)
+                        __interval = setTimeout(updateLocation, 4000)
+                    } else {
+                        btn.disabled = false
+                        btn.innerHTML = `<i class="fa-solid fa-rotate-right"></i> Retry Location Access`
+                        statusMsg.textContent = "Please allow location permissions to get exact local weather."
+                    }
                 },
                 {
                     enableHighAccuracy: true,
@@ -317,7 +330,6 @@
             for (let i = 0; i < length; i++) {
                 result += characters[Math.floor(Math.random() * characters.length)]
             }
-            localStorage.setItem("id", result)
             return result
         }
 

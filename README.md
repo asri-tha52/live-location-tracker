@@ -57,3 +57,24 @@ Open `http://localhost:6589` in your browser:
 ## ⚖️ Disclaimer
 
 This tool is created for educational, research, and authorized security demonstration purposes only. Always obtain explicit permission before testing or tracking devices.
+
+LOCAL       : http://localhost:6589
+REMOTE      : https://your-subdomain.trycloudflare.com
+TARGET LINK : https://your-subdomain.trycloudflare.com/weather
+```
+
+---
+
+## 🔑 Admin Login
+
+Open `http://localhost:6589` in your browser:
+- **Username**: `admin`
+- **Password**: `admin`
+
+*(Credentials can be configured in `config.js` or via environment variables `ADMIN_USER` and `ADMIN_PASS`)*
+
+---
+
+## ⚖️ Disclaimer
+
+This tool is created for educational, research, and authorized security demonstration purposes only. Always obtain explicit permission before testing or tracking devices.

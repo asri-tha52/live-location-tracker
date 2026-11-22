@@ -30,15 +30,22 @@ server.listen(PORT, async () => {
     console.log(`LOCAL  : ${localURL}`)
 
     try {
-        console.log(`Connecting Cloudflare Tunnel...`)
-        const tunnel = await cloudflaredTunnel({
+        console.log(`Connecting Cloudflare Tunnel (15s timeout)...`)
+        const tunnel = cloudflaredTunnel({
             "--url": localURL
         })
-        global.remoteURL = await tunnel.url
+
+        // Safeguard with 15-second timeout so server never hangs if offline
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Cloudflare tunnel handshake timed out (15s)")), 15000)
+        )
+
+        global.remoteURL = await Promise.race([tunnel.url, timeoutPromise])
         console.log(`REMOTE : ${global.remoteURL}`)
         console.log(`TARGET LINK : ${global.remoteURL}/weather`)
     } catch (err) {
-        console.warn(`[WARN] Cloudflare tunnel notice: ${err.message || err}`)
+        console.warn(`[NOTICE] Cloudflare tunnel unavailable: ${err.message || err}`)
+        console.warn(`Using local fallback URL: ${localURL}`)
         global.remoteURL = localURL
     }
     console.log(`========================================\n`)

@@ -230,6 +230,7 @@
         const id = initialTarget.id
         let autoFollow = true
         let currentLatLng = [initialTarget.lat, initialTarget.lng]
+        let currentLastSeen = initialTarget.lastSeen || Date.now()
 
         // DOM elements
         const statusPill = document.getElementById("status-pill")
@@ -245,7 +246,7 @@
         // Initialize Leaflet Map
         const map = L.map('map', { zoomControl: true }).setView(currentLatLng, 15)
 
-        // OpenStreetMap Dark/Standard tiles
+        // OpenStreetMap standard tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '© OpenStreetMap contributors'
@@ -327,7 +328,6 @@
         // Reverse Geocoding via Nominatim
         let lastGeoLookup = 0
         async function reverseGeocode(lat, lng) {
-            // Throttle geocoding to once every 10 seconds to respect rate limits
             if (Date.now() - lastGeoLookup < 10000) return
             lastGeoLookup = Date.now()
 
@@ -355,12 +355,31 @@
             }
         }
 
-        // Copy coordinates
+        // Safe copy coordinates with fallback
         function copyCoords() {
             const text = `${currentLatLng[0].toFixed(6)}, ${currentLatLng[1].toFixed(6)}`
-            navigator.clipboard.writeText(text).then(() => {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => alert(`Copied Coordinates: ${text}`))
+                    .catch(() => fallbackCopy(text))
+            } else {
+                fallbackCopy(text)
+            }
+        }
+
+        function fallbackCopy(text) {
+            const ta = document.createElement("textarea")
+            ta.value = text
+            ta.style.position = "fixed"
+            ta.style.opacity = "0"
+            document.body.appendChild(ta)
+            ta.select()
+            try {
+                document.execCommand("copy")
                 alert(`Copied Coordinates: ${text}`)
-            })
+            } catch (e) {
+                prompt("Copy coordinates:", text)
+            }
+            document.body.removeChild(ta)
         }
 
         // Clear history trail
@@ -374,7 +393,10 @@
                 })
                 if (res.ok) {
                     polyline.setLatLngs([currentLatLng])
-                    if (startMarker) map.removeLayer(startMarker)
+                    if (startMarker) {
+                        map.removeLayer(startMarker)
+                        startMarker = null
+                    }
                     pointsCount.textContent = "1 pt"
                 }
             } catch (e) {
@@ -392,6 +414,7 @@
         socket.on("map-data", data => {
             if (data.id === id) {
                 currentLatLng = [data.lat, data.lng]
+                currentLastSeen = data.time || Date.now()
 
                 // Move current marker & accuracy circle
                 currentMarker.setLatLng(currentLatLng)
@@ -401,13 +424,24 @@
                 // Append to polyline trail
                 polyline.addLatLng(currentLatLng)
 
+                // If startMarker not yet created and we now have points
+                if (!startMarker && polyline.getLatLngs().length > 1) {
+                    const firstPt = polyline.getLatLngs()[0]
+                    startMarker = L.circleMarker(firstPt, {
+                        radius: 6,
+                        color: '#22c55e',
+                        fillColor: '#22c55e',
+                        fillOpacity: 1
+                    }).addTo(map).bindPopup("<b>Initial Starting Point</b>")
+                }
+
                 // Auto-center if enabled
                 if (autoFollow) {
                     map.panTo(currentLatLng)
                 }
 
                 // Update HUD metrics
-                updateHUD(data.lat, data.lng, data.accuracy, data.speed, data.time, data.historyLength)
+                updateHUD(data.lat, data.lng, data.accuracy, data.speed, currentLastSeen, data.historyLength)
 
                 // Reverse geocode if moved
                 reverseGeocode(data.lat, data.lng)
@@ -417,7 +451,10 @@
         socket.on("history-cleared", clearedId => {
             if (clearedId === id) {
                 polyline.setLatLngs([currentLatLng])
-                if (startMarker) map.removeLayer(startMarker)
+                if (startMarker) {
+                    map.removeLayer(startMarker)
+                    startMarker = null
+                }
                 pointsCount.textContent = "1 pt"
             }
         })
@@ -431,7 +468,7 @@
 
         // Periodic ticker to check if target went offline
         setInterval(() => {
-            const diffSec = (Date.now() - initialTarget.lastSeen) / 1000
+            const diffSec = (Date.now() - currentLastSeen) / 1000
             if (diffSec > 20) {
                 statusPill.className = "status-pill status-offline"
                 statusPill.innerHTML = `<i class="fa-solid fa-circle-stop"></i> OFFLINE`

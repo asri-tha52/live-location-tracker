@@ -66,10 +66,12 @@
 
         .pulse-away {
             background-color: #eab308;
+            box-shadow: none;
         }
 
         .pulse-offline {
             background-color: #64748b;
+            box-shadow: none;
         }
 
         @keyframes pulse-green {
@@ -185,10 +187,35 @@
             transports: ['websocket', 'polling']
         })
 
+        // Robust Copy to clipboard helper
+        function copyText(text, cb) {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(cb).catch(() => fallbackCopy(text, cb))
+            } else {
+                fallbackCopy(text, cb)
+            }
+        }
+
+        function fallbackCopy(text, cb) {
+            const ta = document.createElement("textarea")
+            ta.value = text
+            ta.style.position = "fixed"
+            ta.style.opacity = "0"
+            document.body.appendChild(ta)
+            ta.select()
+            try {
+                document.execCommand("copy")
+                if (cb) cb()
+            } catch (e) {
+                prompt("Copy this URL:", text)
+            }
+            document.body.removeChild(ta)
+        }
+
         // Copy Link Action
         function copyTrackingLink() {
-            const urlText = document.getElementById("tracking-url").innerText
-            navigator.clipboard.writeText(urlText).then(() => {
+            const urlText = document.getElementById("tracking-url").innerText.trim()
+            copyText(urlText, () => {
                 const btn = document.getElementById("copy-btn")
                 btn.innerHTML = `<i class="fa-solid fa-check mr-1"></i> Copied!`
                 btn.style.background = "#16a34a"
@@ -225,9 +252,8 @@
 
             let activeCount = 0
             keys.forEach(k => {
-                if (targetsMap[k].lastSeen && (Date.now() - targetsMap[k].lastSeen) < 30000) {
-                    activeCount++
-                }
+                const s = getStatusInfo(targetsMap[k].lastSeen)
+                if (s.label === "Live Online") activeCount++
             })
             activeCountEl.textContent = activeCount
 
@@ -241,9 +267,8 @@
             emptyState.style.display = "none"
             clearAllBtn.style.display = "inline-flex"
 
-            // Render or update each card
+            // Render cards sorted by most recently seen first
             let html = ""
-            // Sort by most recently seen first
             keys.sort((a, b) => (targetsMap[b].lastSeen || 0) - (targetsMap[a].lastSeen || 0))
 
             keys.forEach(id => {
@@ -257,9 +282,9 @@
                 <div class="target-card" id="card-${id}">
                     <div class="is-flex is-justify-content-space-between is-align-items-center is-flex-wrap-wrap is-gap-2 mb-3">
                         <div class="is-flex is-align-items-center">
-                            <span class="pulse-dot ${status.class}"></span>
+                            <span class="pulse-dot ${status.class}" id="pulse-dot-${id}"></span>
                             <strong class="has-text-white is-size-5 mr-2">${id}</strong>
-                            <span class="tag is-dark is-rounded" style="color: ${status.color}; border: 1px solid ${status.color}33;">
+                            <span class="tag is-dark is-rounded" id="status-tag-${id}" style="color: ${status.color}; border: 1px solid ${status.color}33;">
                                 ${status.label}
                             </span>
                         </div>
@@ -276,15 +301,15 @@
                     <div class="columns is-mobile is-multiline mb-2">
                         <div class="column is-6-mobile is-3-tablet">
                             <span class="has-text-grey is-size-7 is-block">COORDINATES</span>
-                            <strong class="has-text-info-light is-size-6">${target.lat.toFixed(5)}, ${target.lng.toFixed(5)}</strong>
+                            <strong class="has-text-info-light is-size-6" id="coords-${id}">${target.lat.toFixed(5)}, ${target.lng.toFixed(5)}</strong>
                         </div>
                         <div class="column is-6-mobile is-3-tablet">
                             <span class="has-text-grey is-size-7 is-block">ACCURACY</span>
-                            <strong class="has-text-white is-size-6">${accuracyText}</strong>
+                            <strong class="has-text-white is-size-6" id="accuracy-${id}">${accuracyText}</strong>
                         </div>
                         <div class="column is-6-mobile is-3-tablet">
                             <span class="has-text-grey is-size-7 is-block">RECORDED POINTS</span>
-                            <strong class="has-text-white is-size-6">${pointCount} locations</strong>
+                            <strong class="has-text-white is-size-6" id="points-${id}">${pointCount} locations</strong>
                         </div>
                         <div class="column is-6-mobile is-3-tablet">
                             <span class="has-text-grey is-size-7 is-block">DEVICE</span>
@@ -298,7 +323,7 @@
                         <a href="/map?id=${id}" class="button is-info is-small is-rounded has-text-weight-bold">
                             <i class="fa-solid fa-map-location-dot mr-1"></i> Open Live Map & Trail
                         </a>
-                        <a href="https://www.google.com/maps?q=${target.lat},${target.lng}" target="_blank" class="button is-dark is-small is-rounded">
+                        <a id="gmaps-btn-${id}" href="https://www.google.com/maps?q=${target.lat},${target.lng}" target="_blank" class="button is-dark is-small is-rounded">
                             <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> Google Maps
                         </a>
                     </div>
@@ -352,7 +377,30 @@
 
         socket.on("target-updated", (target) => {
             targetsMap[target.id] = target
-            renderTargets()
+            const card = document.getElementById(`card-${target.id}`)
+            if (card) {
+                const status = getStatusInfo(target.lastSeen)
+                const dotEl = document.getElementById(`pulse-dot-${target.id}`)
+                if (dotEl) dotEl.className = `pulse-dot ${status.class}`
+                const tagEl = document.getElementById(`status-tag-${target.id}`)
+                if (tagEl) {
+                    tagEl.textContent = status.label
+                    tagEl.style.color = status.color
+                    tagEl.style.borderColor = `${status.color}33`
+                }
+                const timeEl = document.getElementById(`time-ago-${target.id}`)
+                if (timeEl) timeEl.textContent = timeAgo(target.lastSeen)
+                const coordsEl = document.getElementById(`coords-${target.id}`)
+                if (coordsEl) coordsEl.textContent = `${target.lat.toFixed(5)}, ${target.lng.toFixed(5)}`
+                const accEl = document.getElementById(`accuracy-${target.id}`)
+                if (accEl) accEl.textContent = target.accuracy ? `±${Math.round(target.accuracy)}m` : "GPS"
+                const ptsEl = document.getElementById(`points-${target.id}`)
+                if (ptsEl) ptsEl.textContent = `${target.history ? target.history.length : 1} locations`
+                const gmapsBtn = document.getElementById(`gmaps-btn-${target.id}`)
+                if (gmapsBtn) gmapsBtn.href = `https://www.google.com/maps?q=${target.lat},${target.lng}`
+            } else {
+                renderTargets()
+            }
         })
 
         socket.on("target-deleted", (id) => {
@@ -365,16 +413,27 @@
             renderTargets()
         })
 
-        // Periodic ticker to refresh "time ago" and online badges every 2 seconds
+        // Periodic ticker to refresh status badges and "time ago" every 2 seconds
         setInterval(() => {
             const keys = Object.keys(targetsMap)
             let activeCount = 0
             keys.forEach(k => {
                 const target = targetsMap[k]
-                const diffSec = (Date.now() - target.lastSeen) / 1000
-                if (diffSec <= 15) activeCount++
+                const status = getStatusInfo(target.lastSeen)
+                if (status.label === "Live Online") activeCount++
+
                 const timeEl = document.getElementById(`time-ago-${k}`)
                 if (timeEl) timeEl.textContent = timeAgo(target.lastSeen)
+
+                const dotEl = document.getElementById(`pulse-dot-${k}`)
+                if (dotEl) dotEl.className = `pulse-dot ${status.class}`
+
+                const tagEl = document.getElementById(`status-tag-${k}`)
+                if (tagEl) {
+                    tagEl.textContent = status.label
+                    tagEl.style.color = status.color
+                    tagEl.style.borderColor = `${status.color}33`
+                }
             })
             activeCountEl.textContent = activeCount
         }, 2000)
