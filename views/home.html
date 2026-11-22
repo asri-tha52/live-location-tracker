@@ -278,7 +278,7 @@
                 const status = getStatusInfo(target.lastSeen)
                 const pointCount = target.history ? target.history.length : 1
                 const formattedTime = target.lastSeen ? new Date(target.lastSeen).toLocaleTimeString() : "--"
-                const accuracyText = target.accuracy ? `±${Math.round(target.accuracy)}m` : "GPS"
+                const accuracyText = target.accuracy ? (target.accuracy > 500 ? (target.type || "IP Approx") : `±${Math.round(target.accuracy)}m (${target.type || 'GPS'})`) : (target.type || "GPS")
 
                 html += `
                 <div class="target-card" id="card-${id}">

