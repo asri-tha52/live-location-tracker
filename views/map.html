@@ -223,13 +223,15 @@
         <span id="address-text">Resolving physical address...</span>
     </div>
 
+    <script type="application/json" id="target-data">{{- targetJSON }}</script>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/socket.io@4.8.1/client-dist/socket.io.min.js"></script>
     <script>
-        const initialTarget = {{- targetJSON }}
+        const targetDataEl = document.getElementById("target-data")
+        const initialTarget = targetDataEl && targetDataEl.textContent ? JSON.parse(targetDataEl.textContent) : {}
         const id = initialTarget.id
         let autoFollow = true
-        let currentLatLng = [initialTarget.lat, initialTarget.lng]
+        let currentLatLng = [initialTarget.lat || 0, initialTarget.lng || 0]
         let currentLastSeen = initialTarget.lastSeen || Date.now()
 
         // DOM elements
