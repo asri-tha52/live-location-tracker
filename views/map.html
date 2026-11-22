@@ -4,73 +4,439 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Map</title>
+    <title>Live Map Tracking</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
             margin: 0;
             padding: 0;
-            font-family: sans-serif;
             box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
 
         body {
             display: flex;
             flex-direction: column;
             height: 100vh;
-            background: #000;
-            color: aliceblue;
+            background: #0f172a;
+            color: #f1f5f9;
+            overflow: hidden;
         }
 
-        h4 {
-            padding: .5rem;
-
+        /* Top Bar */
+        .hud-header {
+            background: #1e293b;
+            border-bottom: 1px solid #334155;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            z-index: 1000;
         }
 
+        .hud-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .back-btn {
+            background: #334155;
+            color: #f1f5f9;
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.2s;
+        }
+
+        .back-btn:hover {
+            background: #475569;
+        }
+
+        .status-pill {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-online {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+            border: 1px solid #22c55e;
+        }
+
+        .status-offline {
+            background: rgba(148, 163, 184, 0.2);
+            color: #94a3b8;
+            border: 1px solid #94a3b8;
+        }
+
+        .hud-metrics {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-size: 13px;
+            flex-wrap: wrap;
+        }
+
+        .metric-badge {
+            color: #94a3b8;
+        }
+
+        .metric-badge strong {
+            color: #38bdf8;
+            font-weight: 600;
+        }
+
+        .hud-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .action-btn {
+            background: #334155;
+            color: #f1f5f9;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background: #475569;
+        }
+
+        .action-btn.active {
+            background: #0284c7;
+            color: white;
+        }
+
+        /* Map Container */
         #map {
-            height: 100%;
+            flex: 1;
             width: 100%;
+            height: 100%;
+            background: #1e293b;
+        }
+
+        /* Bottom Floating Address Bar */
+        .address-bar {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 41, 59, 0.95);
+            backdrop-filter: blur(8px);
+            border: 1px solid #475569;
+            padding: 10px 18px;
+            border-radius: 30px;
+            font-size: 13px;
+            color: #e2e8f0;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            max-width: 90%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Leaflet custom marker pulse */
+        .pulsing-marker {
+            width: 18px;
+            height: 18px;
+            border: 3px solid #ffffff;
+            border-radius: 50%;
+            background: #0284c7;
+            box-shadow: 0 0 10px #0284c7;
+            animation: radar-ping 1.8s infinite;
+        }
+
+        @keyframes radar-ping {
+            0% { box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.8); }
+            70% { box-shadow: 0 0 0 16px rgba(2, 132, 199, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(2, 132, 199, 0); }
         }
     </style>
 </head>
 
 <body>
-    <h4>ID: <span id="display-id"></span></h4>
+    <header class="hud-header">
+        <div class="hud-left">
+            <a href="/" class="back-btn"><i class="fa-solid fa-arrow-left"></i> Dashboard</a>
+            <strong id="target-id-label" style="font-size: 16px; color: #fff;">{{ id }}</strong>
+            <span id="status-pill" class="status-pill status-online">
+                <i class="fa-solid fa-circle-dot"></i> LIVE
+            </span>
+        </div>
+
+        <div class="hud-metrics">
+            <span class="metric-badge">Coords: <strong id="coords-text">--</strong></span>
+            <span class="metric-badge">Accuracy: <strong id="accuracy-text">--</strong></span>
+            <span class="metric-badge">Speed: <strong id="speed-text">--</strong></span>
+            <span class="metric-badge">Points: <strong id="points-count">--</strong></span>
+            <span class="metric-badge">Updated: <strong id="last-updated-text">--</strong></span>
+        </div>
+
+        <div class="hud-actions">
+            <button class="action-btn active" id="follow-toggle" onclick="toggleFollow()">
+                <i class="fa-solid fa-crosshairs"></i> Auto-Follow
+            </button>
+            <button class="action-btn" onclick="copyCoords()">
+                <i class="fa-solid fa-copy"></i> Copy Coords
+            </button>
+            <a id="gmaps-link" href="#" target="_blank" class="action-btn">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> Google Maps
+            </a>
+            <button class="action-btn" onclick="clearTrailHistory()" style="color: #f87171;">
+                <i class="fa-solid fa-route"></i> Clear Trail
+            </button>
+        </div>
+    </header>
+
     <div id="map"></div>
 
+    <div class="address-bar" id="address-bar">
+        <i class="fa-solid fa-location-dot" style="color: #38bdf8;"></i>
+        <span id="address-text">Resolving physical address...</span>
+    </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/socket.io@4.8.1/client-dist/socket.io.min.js"></script>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/socket.io@4.8.1/client-dist/socket.io.min.js"></script>
     <script>
-        const displayId = document.querySelector("#display-id")
-        const id = new URLSearchParams(location.search).get("id")
-        const latLng = JSON.parse(`{{ data }}`)
-        const map = L.map('map').setView(latLng, 12)
-        const marker = L.marker(latLng).addTo(map)
+        const initialTarget = {{- targetJSON }}
+        const id = initialTarget.id
+        let autoFollow = true
+        let currentLatLng = [initialTarget.lat, initialTarget.lng]
 
+        // DOM elements
+        const statusPill = document.getElementById("status-pill")
+        const coordsText = document.getElementById("coords-text")
+        const accuracyText = document.getElementById("accuracy-text")
+        const speedText = document.getElementById("speed-text")
+        const pointsCount = document.getElementById("points-count")
+        const lastUpdatedText = document.getElementById("last-updated-text")
+        const gmapsLink = document.getElementById("gmaps-link")
+        const addressText = document.getElementById("address-text")
+        const followToggleBtn = document.getElementById("follow-toggle")
+
+        // Initialize Leaflet Map
+        const map = L.map('map', { zoomControl: true }).setView(currentLatLng, 15)
+
+        // OpenStreetMap Dark/Standard tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
         }).addTo(map)
 
+        // Custom Pulsing DivIcon for Current Location
+        const liveIcon = L.divIcon({
+            className: 'pulsing-marker-container',
+            html: '<div class="pulsing-marker"></div>',
+            iconSize: [18, 18],
+            iconAnchor: [9, 9]
+        })
+
+        // Current Marker
+        const currentMarker = L.marker(currentLatLng, { icon: liveIcon }).addTo(map)
+        currentMarker.bindPopup(`<b>${id} (Current Position)</b>`).openPopup()
+
+        // GPS Accuracy circle
+        const accuracyCircle = L.circle(currentLatLng, {
+            radius: initialTarget.accuracy || 20,
+            color: '#0284c7',
+            fillColor: '#38bdf8',
+            fillOpacity: 0.15,
+            weight: 1
+        }).addTo(map)
+
+        // Breadcrumb Trail Polyline
+        const historyCoords = (initialTarget.history || []).map(p => [p.lat, p.lng])
+        if (historyCoords.length === 0) historyCoords.push(currentLatLng)
+
+        const polyline = L.polyline(historyCoords, {
+            color: '#f59e0b',
+            weight: 4,
+            opacity: 0.85,
+            dashArray: '6, 8',
+            lineJoin: 'round'
+        }).addTo(map)
+
+        // Start point marker (if history exists)
+        let startMarker = null
+        if (historyCoords.length > 1) {
+            startMarker = L.circleMarker(historyCoords[0], {
+                radius: 6,
+                color: '#22c55e',
+                fillColor: '#22c55e',
+                fillOpacity: 1
+            }).addTo(map).bindPopup("<b>Initial Starting Point</b>")
+        }
+
+        // Update HUD display with target details
+        function updateHUD(lat, lng, accuracy, speed, lastSeen, historyLength) {
+            coordsText.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+            accuracyText.textContent = accuracy ? `±${Math.round(accuracy)}m` : 'GPS'
+            speedText.textContent = speed != null && speed > 0 ? `${(speed * 3.6).toFixed(1)} km/h` : 'Stationary'
+            pointsCount.textContent = `${historyLength || 1} pts`
+            lastUpdatedText.textContent = new Date(lastSeen).toLocaleTimeString()
+            gmapsLink.href = `https://www.google.com/maps?q=${lat},${lng}`
+
+            const isOnline = (Date.now() - lastSeen) <= 20000
+            if (isOnline) {
+                statusPill.className = "status-pill status-online"
+                statusPill.innerHTML = `<i class="fa-solid fa-circle-dot"></i> LIVE`
+            } else {
+                statusPill.className = "status-pill status-offline"
+                statusPill.innerHTML = `<i class="fa-solid fa-circle-stop"></i> OFFLINE`
+            }
+        }
+
+        // Initial HUD populate
+        updateHUD(
+            initialTarget.lat,
+            initialTarget.lng,
+            initialTarget.accuracy,
+            initialTarget.speed,
+            initialTarget.lastSeen,
+            historyCoords.length
+        )
+
+        // Reverse Geocoding via Nominatim
+        let lastGeoLookup = 0
+        async function reverseGeocode(lat, lng) {
+            // Throttle geocoding to once every 10 seconds to respect rate limits
+            if (Date.now() - lastGeoLookup < 10000) return
+            lastGeoLookup = Date.now()
+
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+                const data = await res.json()
+                if (data && data.display_name) {
+                    addressText.textContent = data.display_name
+                }
+            } catch (err) {
+                addressText.textContent = `Coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)}`
+            }
+        }
+
+        reverseGeocode(initialTarget.lat, initialTarget.lng)
+
+        // Auto-follow toggle
+        function toggleFollow() {
+            autoFollow = !autoFollow
+            if (autoFollow) {
+                followToggleBtn.classList.add("active")
+                map.panTo(currentLatLng)
+            } else {
+                followToggleBtn.classList.remove("active")
+            }
+        }
+
+        // Copy coordinates
+        function copyCoords() {
+            const text = `${currentLatLng[0].toFixed(6)}, ${currentLatLng[1].toFixed(6)}`
+            navigator.clipboard.writeText(text).then(() => {
+                alert(`Copied Coordinates: ${text}`)
+            })
+        }
+
+        // Clear history trail
+        async function clearTrailHistory() {
+            if (!confirm("Clear trail route for this target?")) return
+            try {
+                const res = await fetch("/api/target/clear-history", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id })
+                })
+                if (res.ok) {
+                    polyline.setLatLngs([currentLatLng])
+                    if (startMarker) map.removeLayer(startMarker)
+                    pointsCount.textContent = "1 pt"
+                }
+            } catch (e) {
+                console.error("Clear trail error:", e)
+            }
+        }
+
+        // Socket.IO for Live Location Updates
         const socket = io("", {
             secure: true,
             path: "/socket.io",
-            transports: ['websocket']
+            transports: ['websocket', 'polling']
         })
 
-        displayId.innerHTML = id
-        // on update
         socket.on("map-data", data => {
-            if (data.id == id) {
-                displayId.innerHTML = `${id} - updating`
-                marker.setLatLng([data.lat, data.lng])
-                map.setView([data.lat, data.lng])
+            if (data.id === id) {
+                currentLatLng = [data.lat, data.lng]
 
-                setTimeout(() => {
-                    displayId.innerHTML = id
-                }, 2500)
+                // Move current marker & accuracy circle
+                currentMarker.setLatLng(currentLatLng)
+                accuracyCircle.setLatLng(currentLatLng)
+                if (data.accuracy) accuracyCircle.setRadius(data.accuracy)
+
+                // Append to polyline trail
+                polyline.addLatLng(currentLatLng)
+
+                // Auto-center if enabled
+                if (autoFollow) {
+                    map.panTo(currentLatLng)
+                }
+
+                // Update HUD metrics
+                updateHUD(data.lat, data.lng, data.accuracy, data.speed, data.time, data.historyLength)
+
+                // Reverse geocode if moved
+                reverseGeocode(data.lat, data.lng)
             }
         })
+
+        socket.on("history-cleared", clearedId => {
+            if (clearedId === id) {
+                polyline.setLatLngs([currentLatLng])
+                if (startMarker) map.removeLayer(startMarker)
+                pointsCount.textContent = "1 pt"
+            }
+        })
+
+        socket.on("target-deleted", deletedId => {
+            if (deletedId === id) {
+                alert("This target has been removed.")
+                window.location.href = "/"
+            }
+        })
+
+        // Periodic ticker to check if target went offline
+        setInterval(() => {
+            const diffSec = (Date.now() - initialTarget.lastSeen) / 1000
+            if (diffSec > 20) {
+                statusPill.className = "status-pill status-offline"
+                statusPill.innerHTML = `<i class="fa-solid fa-circle-stop"></i> OFFLINE`
+            }
+        }, 3000)
     </script>
 </body>
 

