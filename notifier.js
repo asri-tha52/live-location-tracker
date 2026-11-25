@@ -46,6 +46,9 @@ class Notifier {
         else if (eventType === "gps_acquired") title = "🎯 Precise GPS Acquired!"
         else if (eventType === "geofence_breach") title = "⚠️ GEOFENCE BREACH DETECTED!"
 
+        let errors = []
+        let dispatched = []
+
         // 1. Send WhatsApp Notification
         if (hasWhatsApp) {
             const waMessage = `*${title}*\n\n` +
@@ -70,17 +73,18 @@ class Notifier {
                     if (body.includes("APIKey is invalid") || body.includes("invalid apikey")) {
                         const errMsg = "CallMeBot API Key is invalid! Please get your actual numeric key from CallMeBot on WhatsApp."
                         console.warn("[WhatsApp CallMeBot Notice]:", errMsg)
-                        if (eventType === "test") throw new Error(errMsg)
+                        errors.push(errMsg)
                     } else if (body.includes("not registered") || body.includes("Please create a new one") || body.includes("not allowed")) {
-                        const errMsg = "Phone number not registered! Please send 'I allow callmebot to send me messages' to +34 941 87 53 10 on WhatsApp first."
+                        const errMsg = "Phone number not registered! Please send 'I allow callmebot to send me messages' to CallMeBot on WhatsApp first."
                         console.warn("[WhatsApp CallMeBot Notice]:", errMsg)
-                        if (eventType === "test") throw new Error(errMsg)
+                        errors.push(errMsg)
                     } else {
                         console.log(`[WhatsApp Alert Sent] Successfully dispatched to +${cleanPhone}`)
+                        dispatched.push("WhatsApp")
                     }
                 } catch (err) {
                     console.warn("[WhatsApp Notifier Error]:", err.message)
-                    if (eventType === "test") throw err
+                    errors.push(err.message)
                 }
             }
 
@@ -98,9 +102,10 @@ class Notifier {
                             eventType
                         })
                     })
+                    dispatched.push("WhatsApp Webhook")
                 } catch (err) {
                     console.warn("[WhatsApp Webhook Error]:", err.message)
-                    if (eventType === "test") throw err
+                    errors.push(err.message)
                 }
             }
         }
@@ -110,7 +115,7 @@ class Notifier {
             const embedColor = eventType === "geofence_breach" ? 0xef4444 : (eventType === "connect" ? 0x22c55e : 0x0284c7)
             const discordPayload = {
                 username: "Live Location Tracker",
-                avatar_url: "https://img.icons8.com/color/96/whatsapp--v1.png",
+                avatar_url: "https://img.icons8.com/color/96/marker--v1.png",
                 embeds: [
                     {
                         title,
@@ -125,7 +130,7 @@ class Notifier {
                             { name: "Battery", value: batteryStr, inline: true },
                             { name: "Network", value: networkStr, inline: true },
                             { name: "Type", value: target.type || "GPS", inline: true },
-                            { name: "Google Maps", value: `[View on Map](${gmapsUrl})`, inline: false }
+                            { name: "Google Maps", value: `[View on Google Maps](${gmapsUrl})`, inline: false }
                         ],
                         footer: { text: `Tracker Alert • ${timeStr}` }
                     }
@@ -133,14 +138,26 @@ class Notifier {
             }
 
             try {
-                await fetch(discordWebhook, {
+                const res = await fetch(discordWebhook, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(discordPayload)
                 })
+                if (!res.ok) {
+                    const errBody = await res.text()
+                    throw new Error(`Discord returned HTTP ${res.status}: ${errBody}`)
+                }
+                console.log("[Discord Alert Sent] Successfully dispatched to Discord channel.")
+                dispatched.push("Discord")
             } catch (err) {
                 console.warn("[Discord Notifier Error]:", err.message)
-                if (eventType === "test") throw err
+                errors.push("Discord: " + err.message)
+            }
+        }
+
+        if (eventType === "test") {
+            if (dispatched.length === 0) {
+                throw new Error(errors.join(" | ") || "Failed to dispatch test notification.")
             }
         }
     }
