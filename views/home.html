@@ -197,7 +197,7 @@
                 </div>
                 <div class="field mb-3">
                     <label class="label has-text-grey-light is-size-7"><i class="fa-solid fa-key mr-1 has-text-success"></i> CallMeBot WhatsApp API Key (Free)</label>
-                    <input class="input is-small" id="wa-apikey" type="password" placeholder="e.g. 123456">
+                    <input class="input is-small" id="wa-apikey" type="text" placeholder="Enter your unique numeric key received from bot">
                 </div>
                 <div class="p-2 mb-4 is-size-7" style="background:#064e3b; border-radius:8px; color:#a7f3d0; line-height:1.4;">
                     💡 <b>How to get your free WhatsApp API Key in 1 minute:</b><br>
@@ -457,14 +457,21 @@
 
         async function sendTestNotification() {
             const status = document.getElementById("test-alert-status")
-            status.textContent = "Sending alert..."
+            status.textContent = "Sending alert to WhatsApp..."
+            status.style.color = "#cbd5e1"
             try {
                 const res = await fetch("/api/test-notification", { method: "POST" })
                 const data = await res.json()
-                if (res.ok) status.textContent = "Sent! Check your WhatsApp/Discord."
-                else status.textContent = `Error: ${data.error}`
+                if (res.ok) {
+                    status.textContent = "✅ Sent! Check your WhatsApp."
+                    status.style.color = "#4ade80"
+                } else {
+                    status.textContent = "❌ " + (data.error || "Failed to dispatch test.")
+                    status.style.color = "#f87171"
+                }
             } catch (e) {
-                status.textContent = "Failed to dispatch test."
+                status.textContent = "❌ Network error dispatching test."
+                status.style.color = "#f87171"
             }
         }
 

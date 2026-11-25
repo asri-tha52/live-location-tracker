@@ -324,10 +324,10 @@ router.post("/api/test-notification", async (req, res) => {
     }
 
     try {
-        await notifier.sendTargetAlert(sampleTarget, "connect")
+        await notifier.sendTargetAlert(sampleTarget, "test")
         res.json({ success: true, message: "Test notification dispatched to configured channels!" })
     } catch (e) {
-        res.status(500).json({ error: e.message })
+        res.status(400).json({ error: e.message })
     }
 })
 
