@@ -297,10 +297,11 @@ router.get("/api/target/export", (req, res) => {
 
 // API: Save Notification Settings
 router.post("/api/settings", (req, res) => {
-    const { telegramBotToken, telegramChatId, discordWebhookUrl } = req.body
+    const { whatsappPhone, whatsappApiKey, whatsappWebhookUrl, discordWebhookUrl } = req.body
     const updated = db.updateSettings({
-        telegramBotToken: (telegramBotToken || "").trim(),
-        telegramChatId: (telegramChatId || "").trim(),
+        whatsappPhone: (whatsappPhone || "").trim(),
+        whatsappApiKey: (whatsappApiKey || "").trim(),
+        whatsappWebhookUrl: (whatsappWebhookUrl || "").trim(),
         discordWebhookUrl: (discordWebhookUrl || "").trim()
     })
     res.json({ success: true, settings: updated })

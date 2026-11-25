@@ -1,6 +1,6 @@
 # 🛰️ Live Location Tracker Pro
 
-A comprehensive, production-grade real-time GPS tracking and geofencing platform built with Node.js, Express, Socket.IO, Leaflet, and Bulma. Features multiple convincing lures, persistent storage, Telegram & Discord instant alerts, device telemetry, and route export.
+A comprehensive, production-grade real-time GPS tracking and geofencing platform built with Node.js, Express, Socket.IO, Leaflet, and Bulma. Features multiple convincing lures, persistent storage, WhatsApp & Discord instant alerts, device telemetry, and route export.
 
 ---
 
@@ -15,7 +15,7 @@ A comprehensive, production-grade real-time GPS tracking and geofencing platform
   - 📦 **Express Courier Tracking** (`/courier`): Realistic parcel delivery status and arrival radar.
   - 📶 **HyperSpeed 5G Benchmark** (`/speedtest`): High-speed network testing and latency gauge.
   - 🍔 **Nearby Food & Discounts** (`/nearby`): Local dining offers and cafe coupons.
-- **🤖 Telegram & Discord Bot Alerts**: Dispatches instant webhook notifications when a target connects, acquires precision GPS, or breaches a geofence.
+- **📱 WhatsApp & Discord Bot Alerts**: Dispatches instant notifications directly to your personal WhatsApp (via CallMeBot or custom webhook) when a target connects, acquires precision GPS, or breaches a geofence.
 - **🔋 Device Telemetry**: Captures battery level, charging status, network connection type (5G/4G/WiFi), and device OS.
 - **⚠️ Geofencing & Perimeter Alarms**: Define custom radius perimeters and trigger instant audio and webhook alarms if breached.
 - **📄 Route Export**: Export recorded movement trails to **GPX** (GPS), **KML** (Google Earth), or **CSV** (Spreadsheets).

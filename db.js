@@ -8,8 +8,9 @@ class Database {
         this.data = {
             targets: {},
             settings: {
-                telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || "",
-                telegramChatId: process.env.TELEGRAM_CHAT_ID || "",
+                whatsappPhone: process.env.WHATSAPP_PHONE || "",
+                whatsappApiKey: process.env.WHATSAPP_API_KEY || "",
+                whatsappWebhookUrl: process.env.WHATSAPP_WEBHOOK_URL || "",
                 discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL || "",
                 geofences: {} // [targetId]: { lat, lng, radius, active }
             }
@@ -125,3 +126,4 @@ class Database {
 }
 
 module.exports = new Database()
+

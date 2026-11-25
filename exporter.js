@@ -101,3 +101,4 @@ ${pointsXml}    </trkseg>
 }
 
 module.exports = new RouteExporter()
+

